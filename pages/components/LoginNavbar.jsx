@@ -1,13 +1,12 @@
 import React from 'react';
-import Button from '@material-ui/core/Button';
+import Button from '@mui/material/Button';
 
-import AdminPanel from './AdminPanel';
+import LoginPanel from './LoginPanel';
 
-
-export function AdminNavbar(props) {
+export function LoginNavbar(props) {
   const { classes, extraButtons } = props;
   const [open, setOpen] = React.useState(false);
-  const navbarIcon = extraButtons['admin'].icon;
+  const navbarIcon = extraButtons['login'].icon;
 
   function handleModalOpen() {
     setOpen(true);
@@ -21,12 +20,12 @@ export function AdminNavbar(props) {
     <React.Fragment>
       <Button color='inherit' className={classes.navbarButton} onClick={handleModalOpen}>
         {navbarIcon}
-        <span className={classes.buttonText}>Admin</span>
+        <span className={classes.buttonText}>Login</span>
       </Button>
-      <AdminPanel classes={classes} open={open} handleModalClose={handleModalClose} />
+      <LoginPanel classes={classes} open={open} handleModalClose={handleModalClose} />
     </React.Fragment>
   );
 
 }
 
-export default AdminNavbar;
+export default LoginNavbar;

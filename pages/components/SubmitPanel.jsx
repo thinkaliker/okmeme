@@ -1,16 +1,16 @@
 import React from 'react';
-import Dialog from '@material-ui/core/Dialog';
-import DialogActions from '@material-ui/core/DialogActions';
-import DialogContent from '@material-ui/core/DialogContent';
-import DialogTitle from '@material-ui/core/DialogTitle';
-import Button from '@material-ui/core/Button';
-import MenuItem from '@material-ui/core/MenuItem';
-import TextField from '@material-ui/core/TextField';
-import FormGroup from '@material-ui/core/FormGroup';
-import FormControlLabel from '@material-ui/core/FormControlLabel';
-import Switch from '@material-ui/core/Switch';
-import Grid from '@material-ui/core/Grid';
-import ListItemIcon from '@material-ui/core/ListItem';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import Button from '@mui/material/Button';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+import FormGroup from '@mui/material/FormGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
+import Grid from '@mui/material/Grid';
+import { useTheme } from '@mui/material/styles';
 
 
 const visibilityTypes = [
@@ -23,9 +23,10 @@ const submitterTypes = [
 
 export function SubmitPanel(props) {
 
-  const { classes, handleModalClose, open, mediaTypes, linkType, tags, url, text, nsfw } = props;
+  const { handleModalClose, open, mediaTypes, linkType, tags, url, text, nsfw } = props;
 
   // const [open, setOpen] = React.useState(false)
+  const theme = useTheme();
   const [mediaType, setMediaType] = React.useState('url')
 
   function handleMediaType(event) {
@@ -35,7 +36,6 @@ export function SubmitPanel(props) {
   return (
     <React.Fragment>
       <Dialog
-        className={classes.modal}
         open={open}
         onClose={handleModalClose}
         id='modal'
@@ -49,21 +49,20 @@ export function SubmitPanel(props) {
             fullWidth
             label="Media Type"
             onChange={handleMediaType}
-            className={classes.selector}
+            // sx={{
+            //   '.MuiSelect-': {
+            //     flex: 1,
+            //     alignItems: 'left'
+            //   }
+            // }}
             value={mediaType}
-            SelectProps={{
-              MenuProps: {
-                className: classes.menu,
-              },
-            }}
             helperText="Select Media Type"
             margin="normal"
           >
             {Object.keys(mediaTypes).map(option => (
               <MenuItem key={option} value={option}>
-                <ListItemIcon>
-                  {mediaTypes[option]['icon']}
-                </ListItemIcon>
+                {mediaTypes[option]['icon']}
+                {' '}
                 {mediaTypes[option]['name']}
               </MenuItem>
             ))}
@@ -72,7 +71,6 @@ export function SubmitPanel(props) {
           <TextField
             id="title"
             label="Title goes here"
-            className={classes.textField}
             fullWidth
             helperText="Enter a descriptive title or whatever"
           />
@@ -80,7 +78,6 @@ export function SubmitPanel(props) {
           <TextField
             id="tags"
             label="Tagging"
-            className={classes.textField}
             helperText="Enter some tags"
             fullWidth
           />
@@ -96,7 +93,6 @@ export function SubmitPanel(props) {
             id="link"
             label="Link"
             fullWidth
-            className={classes.textField}
             helperText="Enter URL"
           />
           <TextField
@@ -104,7 +100,6 @@ export function SubmitPanel(props) {
             label="Text"
             fullWidth
             multiline
-            className={classes.textField}
             helperText="Enter some text"
           />
 

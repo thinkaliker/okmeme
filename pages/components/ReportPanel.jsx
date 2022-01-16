@@ -1,16 +1,17 @@
 import React from 'react';
-import Dialog from '@material-ui/core/Dialog';
-import DialogActions from '@material-ui/core/DialogActions';
-import DialogContent from '@material-ui/core/DialogContent';
-import DialogTitle from '@material-ui/core/DialogTitle';
-import Button from '@material-ui/core/Button';
-import MenuItem from '@material-ui/core/MenuItem';
-import TextField from '@material-ui/core/TextField';
-import FormGroup from '@material-ui/core/FormGroup';
-import FormControlLabel from '@material-ui/core/FormControlLabel';
-import Switch from '@material-ui/core/Switch';
-import Grid from '@material-ui/core/Grid';
-import ReportIcon from '@material-ui/icons/Report';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import Button from '@mui/material/Button';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+import FormGroup from '@mui/material/FormGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
+import Grid from '@mui/material/Grid';
+import ReportIcon from '@mui/icons-material/Report';
+import { useTheme } from '@mui/material/styles';
 
 const reasons = {
   'dmca': {
@@ -33,7 +34,8 @@ const reasons = {
 
 export function ReportPanel(props) {
 
-  const { classes } = props;
+  // const { classes } = props;
+  const theme = useTheme();
   const [open, setOpen] = React.useState(false);
   const [reason, setReason] = React.useState('other');
 
@@ -51,7 +53,7 @@ export function ReportPanel(props) {
         <ReportIcon />
       </Button>
       <Dialog
-        className={classes.modal}
+
         open={open}
         onClose={handleModalClose}
         id='modal'
@@ -67,13 +69,7 @@ export function ReportPanel(props) {
             onChange={(event) => {
               setReason(event.target.value);
             }}
-            className={classes.selector}
             value={reason}
-            SelectProps={{
-              MenuProps: {
-                className: classes.menu,
-              },
-            }}
             helperText="Select Report Reason"
             margin="normal"
           >
@@ -89,7 +85,6 @@ export function ReportPanel(props) {
           <TextField
             id="information"
             label="Additional information"
-            className={classes.textField}
             fullWidth
             helperText="Enter additional information"
           />

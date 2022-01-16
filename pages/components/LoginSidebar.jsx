@@ -1,7 +1,7 @@
 import React from 'react';
-import ListItem from '@material-ui/core/ListItem';
-import ListItemText from '@material-ui/core/ListItemText';
-import ListItemIcon from '@material-ui/core/ListItemIcon';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import ListItemIcon from '@mui/material/ListItemIcon';
 
 import LoginPanel from './LoginPanel';
 
@@ -21,11 +21,15 @@ export function LoginSIdebar(props) {
 
   return (
     <React.Fragment>
-      <ListItem button key='login' className={classes.listItem} onClick={handleModalOpen}>
+      <ListItem button key='login' sx={{
+        display: 'flex',
+        alignItems: 'center',
+        paddingLeft: 2
+      }} onClick={handleModalOpen}>
         <ListItemIcon>{sidebarIcon}</ListItemIcon>
-        <ListItemText className={classes.listItemLabel}>Login</ListItemText>
+        <ListItemText sx={{ fontWeight: 500 }}>Login</ListItemText>
       </ListItem>
-      <LoginPanel classes={classes} open={open} handleModalClose={handleModalClose} />
+      <LoginPanel open={open} handleModalClose={handleModalClose} />
     </React.Fragment>
   );
 

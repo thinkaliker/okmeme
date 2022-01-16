@@ -1,26 +1,32 @@
 import React from 'react';
-import Typography from '@material-ui/core/Typography';
-import Card from '@material-ui/core/Card';
-import CardActionArea from '@material-ui/core/CardActionArea';
-import CardActions from '@material-ui/core/CardActions';
-import CardContent from '@material-ui/core/CardContent';
-import CardMedia from '@material-ui/core/CardMedia';
-import Button from '@material-ui/core/Button';
-import Hidden from '@material-ui/core/Hidden';
+import Typography from '@mui/material/Typography';
+import Card from '@mui/material/Card';
+import CardActionArea from '@mui/material/CardActionArea';
+import CardActions from '@mui/material/CardActions';
+import CardContent from '@mui/material/CardContent';
+import CardMedia from '@mui/material/CardMedia';
+import Button from '@mui/material/Button';
+import Hidden from '@mui/material/Hidden';
 import TimeAgo from 'react-timeago';
-import Tooltip from '@material-ui/core/Tooltip';
+import Tooltip from '@mui/material/Tooltip';
+import { useTheme } from '@mui/material/styles';
 
-import ExpandLessIcon from '@material-ui/icons/ExpandLess';
-import AddCircleIcon from '@material-ui/icons/AddCircle';
-import RemoveCircleIcon from '@material-ui/icons/RemoveCircle';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
+import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
 
 import ReportPanel from './ReportPanel';
+import LinkPreview from './LinkPreview';
 
 function getHostname(url) {
   return new URL(url).host;
 }
 
+const drawerWidth = 240;
+
+
 export function LinkCard(props) {
+  const theme = useTheme();
   const [mediaPreview, setMediaPreview] = React.useState(false);
   const [textPreview, setTextPreview] = React.useState(false);
 
@@ -32,7 +38,7 @@ export function LinkCard(props) {
     setTextPreview(!textPreview);
   }
 
-  const { classes, mediaType, mediaTypes, categoryType, media, link, title, tags, points, author, timestamp, text } = props;
+  const { mediaType, mediaTypes, categoryType, media, link, title, tags, points, author, timestamp, text } = props;
 
   let shortLink = 'text';
   if (link !== '#') {
@@ -43,7 +49,7 @@ export function LinkCard(props) {
 
   return (
     <React.Fragment>
-      <Card className={classes.card}>
+      <Card sx={{ marginBottom: 1 }}>
         <CardActionArea onClick={!text ? null : handleTextClick}>
           {link === '#' ?
             <CardContent>
@@ -54,9 +60,12 @@ export function LinkCard(props) {
             :
             <CardContent>
               <Tooltip title={link} placement='bottom-start'>
-                <a href={link} target='_blank' rel="noopener noreferrer" className={classes.link}>
+                <a href={link} target='_blank' rel="noopener noreferrer" style={{
+                  color: 'inherit',
+                  textDecoration: 'none',
+                }}>
                   <Typography variant="h6">
-                    {mediaTypes[mediaType]['icon']}&nbsp;{title} <Typography variant="overline" className={classes.linkPreview}>{shortLink}</Typography>
+                    {mediaTypes[mediaType]['icon']}&nbsp;{title} <Typography variant="overline" color="secondary">{shortLink}</Typography>
                   </Typography>
                 </a>
               </Tooltip>
@@ -64,8 +73,9 @@ export function LinkCard(props) {
           }
           {!media ? null :
             <Hidden xsDown>
+              {/* <LinkPreview url={media} title={title} /> */}
               <CardMedia
-                className={mediaPreview ? classes.mediaFull : classes.mediaPreview}
+                sx={{ height: 100 }}
                 image={media}
                 title={title}
                 onClick={handleMediaClick}
@@ -99,7 +109,7 @@ export function LinkCard(props) {
           </Hidden>
           <Hidden smDown>
             <Typography variant='body1'>|</Typography>
-            <div className={classes.tags}>
+            <div>
               {tags.map((tag, index) => (
                 <Button size="small" color="primary" key={title + tag + index}>
                   #{tag}
@@ -108,8 +118,8 @@ export function LinkCard(props) {
               }
             </div>
           </Hidden>
-          <div className={classes.grow}></div>
-          <ReportPanel classes={classes} />
+          <div style={{ flexGrow: 1 }}></div>
+          <ReportPanel />
         </CardActions>
       </Card>
     </React.Fragment>

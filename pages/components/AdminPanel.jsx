@@ -1,35 +1,35 @@
 import React from 'react';
-import Dialog from '@material-ui/core/Dialog';
-import DialogActions from '@material-ui/core/DialogActions';
-import DialogContent from '@material-ui/core/DialogContent';
-import DialogTitle from '@material-ui/core/DialogTitle';
-import List from '@material-ui/core/List';
-import ListItem from '@material-ui/core/ListItem';
-import ListItemText from '@material-ui/core/ListItemText';
-import ListItemIcon from '@material-ui/core/ListItemIcon';
-import ListItemSecondaryAction from '@material-ui/core/ListItemSecondaryAction';
-import IconButton from '@material-ui/core/IconButton';
-import Checkbox from '@material-ui/core/Checkbox';
-import Button from '@material-ui/core/Button';
-import TextField from '@material-ui/core/TextField';
-import FormGroup from '@material-ui/core/FormGroup';
-import FormControlLabel from '@material-ui/core/FormControlLabel';
-import Switch from '@material-ui/core/Switch';
-import Grid from '@material-ui/core/Grid';
-import Typography from '@material-ui/core/Typography';
-import Tab from '@material-ui/core/Tab';
-import Tabs from '@material-ui/core/Tabs';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemSecondaryAction from '@mui/material/ListItemSecondaryAction';
+import IconButton from '@mui/material/IconButton';
+import Checkbox from '@mui/material/Checkbox';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import FormGroup from '@mui/material/FormGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
+import Grid from '@mui/material/Grid';
+import Typography from '@mui/material/Typography';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 
-import BuildIcon from '@material-ui/icons/Build';
-import DoneOutlineIcon from '@material-ui/icons/DoneOutline';
-import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
-import VerifiedUserIcon from '@material-ui/icons/VerifiedUser';
-import PermIdentityIcon from '@material-ui/icons/PermIdentity';
-import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
+import BuildIcon from '@mui/icons-material/Build';
+import DoneOutlineIcon from '@mui/icons-material/DoneOutline';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import PermIdentityIcon from '@mui/icons-material/PermIdentity';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 
 
 export function AdminPanel(props) {
-  const { classes, open, handleModalClose } = props;
+  const { open, handleModalClose } = props;
   const [tabVal, setTabVal] = React.useState(0);
 
   function changeTab(event, val) {
@@ -39,7 +39,6 @@ export function AdminPanel(props) {
   return (
     <React.Fragment>
       <Dialog
-        className={classes.modal}
         open={open}
         onClose={handleModalClose}
         id='modal-admin'
@@ -55,7 +54,7 @@ export function AdminPanel(props) {
             role='tabpanel'
             hidden={tabVal !== 0}
           >
-            <List dense className={classes.list}>
+            <List dense sx={{ minWidth: 500 }}>
               {
                 ['a', 'b', 'c'].map(value => {
                   const labelId = `request-item-${value}`;
@@ -83,7 +82,7 @@ export function AdminPanel(props) {
             role='tabpanel'
             hidden={tabVal !== 1}
           >
-            <List dense className={classes.list}>
+            <List dense sx={{ minWidth: 500 }}>
               {
                 ['111', '222', '333'].map(value => {
                   const labelId = `users-item-${value}`;
