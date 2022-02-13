@@ -7,8 +7,11 @@ import { CacheProvider } from '@emotion/react';
 import theme from '../src/theme';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import createEmotionCache from '../src/createEmotionCache';
+import { Auth } from '@supabase/ui';
+import { supabase } from '../utils/initSupabase';
 
 import './../src/App.css';
+
 
 // Client-side cache, shared for the whole session of the user in the browser.
 const clientSideEmotionCache = createEmotionCache();
@@ -41,22 +44,24 @@ export default function MyApp(props) {
   );
 
   return (
-    <CacheProvider value={emotionCache}>
-      <Head>
-        <meta name="viewport" content="initial-scale=1, width=device-width" />
-        <meta name="theme-color" content={theme.palette.primary.main} />
-        <title>OKMEME!</title>
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap"
-        />
-      </Head>
-      <ThemeProvider theme={theme}>
-        {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
-        <CssBaseline />
-        <Component {...pageProps} />
-      </ThemeProvider>
-    </CacheProvider>
+    <Auth.UserContextProvider supabaseClient={supabase}>
+      <CacheProvider value={emotionCache}>
+        <Head>
+          <meta name="viewport" content="initial-scale=1, width=device-width" />
+          <meta name="theme-color" content={theme.palette.primary.main} />
+          <title>OKMEME!</title>
+          <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap"
+          />
+        </Head>
+        <ThemeProvider theme={theme}>
+          {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
+          <CssBaseline />
+          <Component {...pageProps} />
+        </ThemeProvider>
+      </CacheProvider>
+    </Auth.UserContextProvider>
   );
 }
 

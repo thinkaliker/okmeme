@@ -15,7 +15,8 @@
     "prop-types": "^15.7.2",
     "react": "latest",
     "react-dom": "latest",
-    "react-timeago": "^5.2.0"
+    "react-timeago": "^5.2.0",
+    "swr": "^1.1.2"
   },
   "scripts": {
     "dev": "next dev",
