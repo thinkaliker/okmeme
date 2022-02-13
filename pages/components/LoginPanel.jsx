@@ -32,21 +32,26 @@ const LoginPanel = (props) => {
       if (event === 'PASSWORD_RECOVERY') setAuthView('update_password')
       if (event === 'USER_UPDATED') setTimeout(() => setAuthView('sign_in'), 1000)
       if (event === 'SIGNED_IN') {
-        console.log(user, session, data, fetcher);
+        // console.log(user, session, data, fetcher);
+        updateSupabaseCookie(event, session);
         // handleModalClose() 
       }
-      // Send session to /api/auth route to set the auth cookie.
-      // NOTE: this is only needed if you're doing SSR (getServerSideProps)!
-      fetch('/api/auth', {
-        method: 'POST',
-        headers: new Headers({ 'Content-Type': 'application/json' }),
-        credentials: 'same-origin',
-        body: JSON.stringify({ event, session }),
-      }).then((res) => { res.json() })
     })
 
     return () => {
       authListener.unsubscribe()
+    }
+    async function updateSupabaseCookie(event, session) {
+      // Send session to /api/auth route to set the auth cookie.
+      // NOTE: this is only needed if you're doing SSR (getServerSideProps)!
+      console.log('asdfjkl', session, event)
+      if (!session) return;
+      await fetch("/api/auth", {
+        method: "POST",
+        headers: new Headers({ "Content-Type": "application/json" }),
+        credentials: "same-origin",
+        body: JSON.stringify({ event, session }),
+      });
     }
   }, [])
 
