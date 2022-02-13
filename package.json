@@ -16,7 +16,8 @@
     "react": "latest",
     "react-dom": "latest",
     "react-timeago": "^5.2.0",
-    "swr": "^1.1.2"
+    "swr": "^1.1.2",
+    "typescript": "^4.5.5"
   },
   "scripts": {
     "dev": "next dev",
