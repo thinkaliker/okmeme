@@ -7,10 +7,10 @@ import DialogTitle from '@mui/material/DialogTitle';
 import { useTheme } from '@mui/material/styles';
 
 import useSWR from 'swr'
-import { supabase } from '../../utils/initSupabase'
+import { supabase } from '../utils/initSupabase'
 import Auth from './Auth'
 // import { Auth, Space } from '@supabase/ui'
-import { useUser } from '../../lib/UserContext'
+import { useUser } from '../lib/UserContext'
 
 const fetcher = (url, token) =>
   fetch(url, {
