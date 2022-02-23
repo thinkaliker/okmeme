@@ -12,6 +12,16 @@ import Auth from './Auth'
 // import { Auth, Space } from '@supabase/ui'
 import { useUser } from '../lib/UserContext'
 
+
+const buttonStyle = {
+  marginBottom: '32px',
+  display: 'block',
+  width: '320px',
+  fontSize: '16px',
+  padding: '8px',
+  cursor: 'pointer'
+}
+
 const fetcher = (url, token) =>
   fetch(url, {
     method: 'GET',
@@ -30,11 +40,12 @@ const LoginPanel = (props) => {
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') setAuthView('update_password')
-      if (event === 'USER_UPDATED') setTimeout(() => setAuthView('sign_in'), 1000)
+      if (event === 'USER_UPDATED') setAuthView('sign_in')
       if (event === 'SIGNED_IN') {
         // console.log(user, session, data, fetcher);
         updateSupabaseCookie(event, session);
-        // handleModalClose() 
+        handleModalClose()
+        console.log('Signed in!')
       }
     })
 
@@ -44,7 +55,6 @@ const LoginPanel = (props) => {
     async function updateSupabaseCookie(event, session) {
       // Send session to /api/auth route to set the auth cookie.
       // NOTE: this is only needed if you're doing SSR (getServerSideProps)!
-      console.log('asdfjkl', session, event)
       if (!session) return;
       await fetch("/api/auth", {
         method: "POST",
@@ -66,19 +76,17 @@ const LoginPanel = (props) => {
         <DialogTitle>Login to OKMEME!</DialogTitle>
         <DialogContent>
           {user ?
-            <div>logged in!</div>
+            <>
+              <h4>You're signed in</h4>
+              <h5>Email: {email}</h5>
+
+              <button type="outline" style={buttonStyle} onClick={() => supabase.auth.signOut()}>
+                Log out
+              </button>
+            </>
             :
             <div style={{ maxWidth: '520px', margin: '96px auto' }}>
               <Auth providedEmail={''} supabaseClient={supabase} authView={authView} setAuthView={setAuthView} />
-              {/* <Space>
-                <Auth
-                  supabaseClient={supabase}
-                  providers={['google', 'github']}
-                  view={authView}
-                  socialLayout="horizontal"
-                  socialButtonSize="xlarge"
-                />
-              </Space> */}
             </div>
           }
         </DialogContent>

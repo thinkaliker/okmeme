@@ -25,7 +25,7 @@ const fetcher = (url, token) =>
     useEffect(() => {
       const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'PASSWORD_RECOVERY') setAuthView('update_password')
-        if (event === 'USER_UPDATED') setTimeout(() => setAuthView('sign_in'), 1000)
+        if (event === 'USER_UPDATED') router.push('/')
         // Send session to /api/auth route to set the auth cookie.
         // NOTE: this is only needed if you're doing SSR (getServerSideProps)!
         fetch('/api/auth', {
@@ -54,36 +54,36 @@ const fetcher = (url, token) =>
             <Auth providedEmail={email} supabaseClient={supabase} authView={authView} setAuthView={setAuthView} />
           </>
         )
-  
-      return (
-        <>
-          {authView === 'update_password' && <Auth.UpdatePassword supabaseClient={supabase} />}
-          {user && (
-            <>
-              <h4>You're signed in</h4>
-              <h5>Email: {user.email}</h5>
-  
-              <button type="outline" onClick={() => supabase.auth.signOut()}>
-                Log out
-              </button>
-              <hr />
-              {error && <div style={{ color: 'red' }}>Failed to fetch user!</div>}
-              {data && !error ? (
-                <>
-                  <div style={{ color: 'green' }}>
-                    User data retrieved server-side (in API route):
-                  </div>
-  
-                  <pre>{JSON.stringify(data, null, 2)}</pre>
-                </>
-              ) : (
-                <div>Loading...</div>
-              )}
-  
-            </>
-          )}
-        </>
-      )
+      else
+        return (
+          <>
+            {authView === 'update_password' && <Auth.UpdatePassword supabaseClient={supabase} />}
+            {user && (
+              <>
+                <h4>You're signed in</h4>
+                <h5>Email: {user.email}</h5>
+    
+                <button type="outline" onClick={() => supabase.auth.signOut()}>
+                  Log out
+                </button>
+                <hr />
+                {error && <div style={{ color: 'red' }}>Failed to fetch user!</div>}
+                {data && !error ? (
+                  <>
+                    <div style={{ color: 'green' }}>
+                      User data retrieved server-side (in API route):
+                    </div>
+    
+                    <pre>{JSON.stringify(data, null, 2)}</pre>
+                  </>
+                ) : (
+                  <div>Loading...</div>
+                )}
+    
+              </>
+            )}
+          </>
+        )
     }
   
     return (

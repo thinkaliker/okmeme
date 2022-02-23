@@ -43,7 +43,7 @@ const Login = () => {
   
 const View = () => {
     if (!user)
-    return (
+      return (
         <>
         <div>
             <img src="/okmeme.png" width="96" />
@@ -51,10 +51,10 @@ const View = () => {
             OKMEME Login
             </h2>
         </div>
-        <Auth supabaseClient={supabase} authView={authView} setAuthView={setAuthView} />
+        <Auth  supabaseClient={supabase} authView={authView} setAuthView={setAuthView} />
         </>
-    )
-  
+      )
+    else
       return (
         <React.Fragment>
           {/* {authView === 'update_password' && <Auth.UpdatePassword supabaseClient={supabase} />} */}
