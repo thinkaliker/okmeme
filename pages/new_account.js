@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import useSWR from 'swr'
-import { supabase } from '../utils/initSupabase'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/router'
+
+import { supabase } from '../utils/initSupabase'
 import Auth from '../components/Auth'
 import { useUser } from '../lib/UserContext'
 
@@ -16,6 +18,9 @@ const fetcher = (url, token) =>
     const { user, session } = useUser()
     const { data, error } = useSWR(session ? ['/api/getUser', session.access_token] : null, fetcher)
     const [authView, setAuthView] = useState('sign_up')
+
+    const router = useRouter();
+    const { email } = router.query
   
     useEffect(() => {
       const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
@@ -46,7 +51,7 @@ const fetcher = (url, token) =>
                 OKMEME Signup
               </h2>
             </div>
-            <Auth supabaseClient={supabase} authView={authView} setAuthView={setAuthView} />
+            <Auth providedEmail={email} supabaseClient={supabase} authView={authView} setAuthView={setAuthView} />
           </>
         )
   
@@ -75,9 +80,6 @@ const fetcher = (url, token) =>
                 <div>Loading...</div>
               )}
   
-              <Link href="/profile">
-                <a>SSR example with getServerSideProps</a>
-              </Link>
             </>
           )}
         </>

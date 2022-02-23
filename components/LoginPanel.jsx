@@ -69,7 +69,7 @@ const LoginPanel = (props) => {
             <div>logged in!</div>
             :
             <div style={{ maxWidth: '520px', margin: '96px auto' }}>
-              <Auth supabaseClient={supabase} authView={authView} setAuthView={setAuthView} />
+              <Auth providedEmail={''} supabaseClient={supabase} authView={authView} setAuthView={setAuthView} />
               {/* <Space>
                 <Auth
                   supabaseClient={supabase}

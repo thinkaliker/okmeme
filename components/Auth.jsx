@@ -21,9 +21,8 @@ const buttonStyle = {
 }
 
 function Auth(props) {
-    const { supabaseClient, authView, setAuthView } = props
-
-    const [email, setEmail] = useState('')
+    const { supabaseClient, authView, setAuthView, providedEmail } = props
+    const [email, setEmail] = useState(providedEmail)
     const [password, setPassword] = useState('')
     const [message, setMessage] = useState('')
     const [error, setError] = useState('')
@@ -48,12 +47,12 @@ function Auth(props) {
         setError('')
         setLoading(true)
 
-        const { error: signUpError } = await supabaseClient.auth.signUp({
+        const { error: signUpError } = await supabaseClient.auth.update({
             email,
             password,
         })
         if (signUpError) setError(signUpError.message)
-        else setMessage('Check your email to confirm your account')
+        else setMessage('Password set!')
         setLoading(false)
     }
 
@@ -143,7 +142,7 @@ function Auth(props) {
                         <button type="submit" style={buttonStyle}>Sign Up</button>
                     </form>
                     <hr />
-                    <a onClick={() => setAuthView('sign_in')}>Already have an account? Sign in</a>
+                    {/* <a onClick={() => setAuthView('sign_in')}>Already have an account? Sign in</a> */}
                     {/* <a onClick={() => setAuthView('forgotten_password')}>Forgot my password</a> */}
                 </>
             ) : authView === 'forgotten_password' ? (
