@@ -2,7 +2,7 @@ import Link from 'next/link'
 import useSWR from 'swr'
 import { supabase } from '../utils/initSupabase'
 import { useEffect, useState } from 'react'
-import Auth from './components/Auth'
+import Auth from '../components/Auth'
 import { useUser } from '../lib/UserContext'
 
 const fetcher = (url, token) =>
