@@ -147,7 +147,7 @@ function Auth(props) {
                 </>
             ) : authView === 'forgotten_password' ? (
                 <>
-                    <h4>Forgotten password</h4>
+                    <h4>Forgotten Password / Password Reset</h4>
                     <form onSubmit={handlePasswordReset}>
                         <label htmlFor="forgotten_password__email">Email</label>
                         <input
@@ -159,13 +159,12 @@ function Auth(props) {
                             onChange={(e) => setEmail(e.target.value)}
                             style={inputStyle}
                         />
-                        <button type="submit">Send reset password instructions</button>
+                        <button style={buttonStyle} type="submit">Send reset password instructions</button>
                     </form>
                     <hr />
                     {/* <a onClick={() => setAuthView('sign_up')}>Don't have an account? Sign up</a> */}
                     <a onClick={() => setAuthView('sign_in')}>Already have an account? Sign in</a>
-                    <hr />
-                    <a onClick={() => setAuthView('magic_link')}>Send magic link email</a>
+                    {/* <a onClick={() => setAuthView('magic_link')}>Send magic link email</a> */}
                 </>
             ) : authView === 'magic_link' ? (
                 <>
@@ -184,6 +183,10 @@ function Auth(props) {
                     <hr />
                     {/* <a onClick={() => setAuthView('sign_up')}>Don't have an account? Sign up</a> */}
                     <a onClick={() => setAuthView('sign_in')}>Already have an account? Sign in</a>
+                </>
+            ) : authView === 'update_password' ? (
+                <>
+                    <div>update</div>
                 </>
             ) : null}
         </>
@@ -219,8 +222,9 @@ function UpdatePassword({ supabaseClient }) {
                     placeholder="Enter your new password"
                     type="password"
                     onChange={(e) => setPassword(e.target.value)}
+                    style={inputStyle}
                 />
-                <button block size="large" htmlType="submit">
+                <button style={buttonStyle} type="submit">
                     Update password
                 </button>
             </form>
