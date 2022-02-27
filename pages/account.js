@@ -29,8 +29,10 @@ const Account = () => {
 
     useEffect(() => {    
       if (router.isReady) {
-        const {view} = router.query;
-        setAuthView(view)
+        const { view } = router.query;
+        if (view !== ''){
+          setAuthView(view)
+        }
         console.log('ready', view, authView)
       }
 
@@ -59,6 +61,11 @@ const Account = () => {
     
       
     const View = () => {
+      if (authView === undefined || authView === '') {
+        return(
+          <h2>Nope.</h2>
+        )
+      }
       if (!user)
         return (
           <>
@@ -71,7 +78,7 @@ const Account = () => {
                 <Auth providedEmail={email} supabaseClient={supabase} authView={authView} setAuthView={setAuthView} />
               }
               {
-              authView === 'update_password' &&  <Auth.UpdatePassword supabaseClient={supabase} /> 
+                authView === 'update_password' &&  <Auth.UpdatePassword supabaseClient={supabase} /> 
               }
           </div>
           

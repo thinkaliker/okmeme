@@ -39,7 +39,7 @@ export function LinkCard(props) {
     setTextPreview(!textPreview);
   }
 
-  const { mediaType, mediaTypes, media, link, title, tags, saved, author, timestamp, text } = props;
+  const { mediaType, mediaTypes, media, link, title, tags, saved, author, timestamp, text, loggedIn } = props;
 
   let shortLink = 'text';
   if (link !== '#') {
@@ -94,11 +94,10 @@ export function LinkCard(props) {
           }
         </CardActionArea>
         <CardActions>
-          <Button size="small" color="secondary">
-            <BookmarkItem />&nbsp;{saved > 0 ? saved : null}
-          </Button>
+
+          <BookmarkItem saved={saved} />
           {/* <Button size="small" color="secondary"> */}
-          {/* hide name if not logged in */}
+          {/* hide name if not admin */}
           {/* {author} */}
           {/* </Button> */}
           <Hidden xsDown>

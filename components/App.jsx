@@ -23,7 +23,6 @@ import Brightness7Icon from '@mui/icons-material/Brightness7';
 import PhotoIcon from '@mui/icons-material/Photo';
 import AudiotrackIcon from '@mui/icons-material/Audiotrack';
 
-import LinkCard from './LinkCard';
 import SidebarItem from './SidebarItem';
 import LoginNavbar from './LoginNavbar';
 import LoginSidebar from './LoginSidebar';
@@ -33,6 +32,7 @@ import SubmitNavbar from './SubmitNavbar';
 import SubmitSidebar from './SubmitSidebar';
 import RulesSidebar from './RulesSidebar';
 import TagSidebar from './TagSidebar';
+import LinkList from './LinkList';
 
 import { supabase } from '../utils/initSupabase';
 
@@ -209,17 +209,7 @@ export default function App() {
 
             </Drawer>
             <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-                <List sx={{ paddingTop: 9 }}>
-                    <LinkCard mediaTypes={mediaTypes} mediaType={'text'} saved='12' link='#' timestamp='1553239282400' title='lizard really long text title asdf asdf asdf asdf asdf asdf asdf asdf asdf asdf qwerty qwerty qwerty' tags={['a', 'b', 'c']} author='bob' />
-                    <LinkCard mediaTypes={mediaTypes} mediaType={'url'} saved='23' link='https://okme.me' timestamp='1553238236670' title='asdf asdf' tags={['aas', 'basdf', 'casdf']} author='joe' />
-                    <LinkCard mediaTypes={mediaTypes} mediaType={'image'} saved='69' media='https://i.redd.it/piutnnjg3en21.png' link='https://i.redd.it/piutnnjg3en21.png' timestamp='1553238236670' title='satiscraftory' tags={['aas', 'basdf', 'casdf']} author='joe' />
-                    <LinkCard mediaTypes={mediaTypes} mediaType={'text'} saved='0' link='#' timestamp='1553238236670' title='asdf sddf' tags={['aas', 'basdf', 'casdf']} author='joe' />
-                    <LinkCard mediaTypes={mediaTypes} mediaType={'image'} saved='42' media='https://i.redd.it/piutnnjg3en21.png' link='https://reddit.com/r/satisfactorygame' timestamp='1553238236670' title='satsifacredditory' tags={['aas', 'basdf', 'casdf']} author='joe' />
-                    <LinkCard mediaTypes={mediaTypes} mediaType={'audio'} saved='42' media='' link='https://soundcloud.com/majorleaguewobs/hamster-dance-trap-remix' timestamp='1551038236670' title='asdf a' tags={['aas', 'basdf', 'casdf']} author='joe' />
-                    <LinkCard mediaTypes={mediaTypes} mediaType={'text'} saved='42' link='#' timestamp='1553238236670' title='asdf' tags={['aas', 'basdf', 'casdf']} author='joe' text='this is self text now boiz aslkdjf ajskfk fskld ajljfklajshfja hjkdfhsfhjks kdsajlf jdskl fjash fjkdhsjkafhajkshfjkdhsjka hfsdjkh fjkasdhfjksdhkaflhsdjklh asjkfh asdjkh fjkash kfjldhskja hfsdjkl hfjkasdh jkl hjkh fjkds ajkh s akljdfklsjkf akfdkl klajfkajfkdjkfjskl akl fklsdjklf askf sdkl jfsdjfklfj sdajfklaj fklsd fklsd flsd klsda fklj' />
-                    <LinkCard mediaTypes={mediaTypes} mediaType={'video'} saved='42' link='https://www.youtube.com/watch?v=RM4IjR3DtrQ' timestamp='1553238236670' title='asdfaaasss' tags={['aas', 'basdf', 'casdf']} author='joe' />
-                </List>
-
+                <LinkList mediaTypes={mediaTypes} supabase={supabase} loggedIn={loggedIn} />
             </Box>
         </Box>
     );

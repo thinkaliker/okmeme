@@ -5,19 +5,15 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import { useTheme } from '@mui/material/styles';
+import Button from '@mui/material/Button';
 
-import useSWR from 'swr'
-import Auth from './Auth'
-import { useUser } from '../lib/UserContext'
+import useSWR from 'swr';
+import Auth from './Auth';
+import { useUser } from '../lib/UserContext';
 
 
 const buttonStyle = {
-  marginBottom: '32px',
-  display: 'block',
-  width: '320px',
-  fontSize: '16px',
-  padding: '8px',
-  cursor: 'pointer'
+  marginBottom: '4px'
 }
 
 const fetcher = (url, token) =>
@@ -74,19 +70,35 @@ const LoginPanel = (props) => {
         onClose={handleModalClose}
         id='modal'
       >
-        <DialogTitle>Login to OKMEME!</DialogTitle>
+        <DialogTitle>{loggedIn ? 'Account Management' : 'Login to OKMEME!'}</DialogTitle>
         <DialogContent>
           {loggedIn ?
             <>
-              <h4>You're signed in</h4>
-              <h5>Email: {supabase.auth.user().email}</h5>
+              <h5>Account: {supabase.auth.user().email}</h5>
+              <Button
+                href={'/account?view=update_password&email=' + supabase.auth.user().email}
+                target="_blank"
+                fullWidth
+                variant="outlined"
+                color="secondary"
+                style={buttonStyle}
+              >
+                Update Password
+              </Button>
 
-              <button type="outline" style={buttonStyle} onClick={() => supabase.auth.signOut()}>
-                Log out
-              </button>
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                style={buttonStyle}
+                onClick={() => supabase.auth.signOut()}
+                color="secondary"
+              >
+                Log Out
+              </Button>
             </>
             :
-            <div style={{ maxWidth: '520px', margin: 'auto' }}>
+            <div style={{ maxWidth: '320px', margin: 'auto' }}>
               <Auth providedEmail={''} supabaseClient={supabase} authView={authView} setAuthView={setAuthView} />
             </div>
           }
@@ -95,7 +107,7 @@ const LoginPanel = (props) => {
 
         </DialogActions>
       </Dialog>
-    </React.Fragment>
+    </React.Fragment >
   )
 
 }

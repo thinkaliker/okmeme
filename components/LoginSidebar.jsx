@@ -29,7 +29,7 @@ export function LoginSidebar(props) {
         <ListItemIcon><InputIcon /></ListItemIcon>
         <ListItemText sx={{ fontWeight: 500 }}>
           {
-            loggedIn ? 'Logout' : 'Login'
+            loggedIn ? 'Account' : 'Login'
           }
         </ListItemText>
       </ListItem>

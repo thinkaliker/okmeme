@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from 'react'
 
-import { Button } from '@mui/material';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
 
 
 const inputStyle = {
-    display: 'block',
-    width: '320px',
-    fontSize: '16px',
-    padding: '8px',
     marginBottom: '16px',
 }
 
@@ -87,31 +84,31 @@ function Auth(props) {
                 <>
                     <h4>Sign in</h4>
                     <form onSubmit={(e) => handleSignIn(e)}>
-                        <label htmlFor="sign-in__email">Email</label>
-                        <input
+                        <TextField
                             id="sign-in__email"
                             label="Email address"
                             autoComplete="email"
-                            placeholder="Type in your email address"
+                            placeholder="okmeme@example.com"
                             defaultValue={email}
                             onChange={(e) => setEmail(e.target.value)}
+                            fullWidth
                             style={inputStyle}
                         />
-                        <label htmlFor="sign-in__password">Password</label>
-                        <input
+                        <TextField
                             id="sign-in__password"
                             label="Password"
                             type="password"
-                            defaultValue={password}
                             autoComplete="current-password"
+                            defaultValue={password}
                             onChange={(e) => setPassword(e.target.value)}
+                            fullWidth
                             style={inputStyle}
                         />
-                        <button type="submit" style={buttonStyle}>Sign In</button>
+                        <Button type="submit" fullWidth variant="contained">Sign In</Button>
                     </form>
                     <hr />
                     {/* <a onClick={() => setAuthView('sign_up')}>Don't have an account? Sign up</a> */}
-                    <a onClick={() => setAuthView('forgotten_password')}>Forgot my password</a>
+                    <Button onClick={() => setAuthView('forgotten_password')}>Forgot my password</Button>
                     {/* <hr />
                     <a onClick={() => setAuthView('magic_link')}>Send magic link email</a> */}
                 </>
@@ -119,29 +116,29 @@ function Auth(props) {
                 <>
                     <h4>Sign up</h4>
                     <form onSubmit={(e) => handleSignUp(e)}>
-                        <label htmlFor="sign-up__email">Email</label>
-                        <input
+                        <TextField
                             id="sign-up__email"
                             label="Email address"
                             autoComplete="email"
-                            placeholder="Type in your email address"
+                            placeholder="okmeme@example.com"
                             defaultValue={email}
                             onChange={(e) => setEmail(e.target.value)}
+                            fullWidth
                             style={inputStyle}
                         />
-                        <label htmlFor="sign-up__password">Password</label>
-                        <input
+                        <TextField
                             id="sign-up__password"
                             label="Password"
                             type="password"
-                            defaultValue={password}
                             autoComplete="current-password"
+                            defaultValue={password}
                             onChange={(e) => setPassword(e.target.value)}
+                            fullWidth
                             style={inputStyle}
                         />
-                        <button type="submit" style={buttonStyle}>Sign Up</button>
+                        <Button type="submit" fullWidth variant="contained">Sign Up</Button>
                     </form>
-                    <hr />
+                    {/* <hr /> */}
                     {/* <a onClick={() => setAuthView('sign_in')}>Already have an account? Sign in</a> */}
                     {/* <a onClick={() => setAuthView('forgotten_password')}>Forgot my password</a> */}
                 </>
@@ -149,40 +146,42 @@ function Auth(props) {
                 <>
                     <h4>Forgotten Password / Password Reset</h4>
                     <form onSubmit={handlePasswordReset}>
-                        <label htmlFor="forgotten_password__email">Email</label>
-                        <input
+                        <TextField
                             id="forgotten_password__email"
                             label="Email address"
                             autoComplete="email"
-                            placeholder="Type in your email address"
+                            placeholder="okmeme@example.com"
                             defaultValue={email}
                             onChange={(e) => setEmail(e.target.value)}
+                            fullWidth
                             style={inputStyle}
                         />
-                        <button style={buttonStyle} type="submit">Send reset password instructions</button>
+                        <Button type="submit" fullWidth variant="contained">Send reset email</Button>
                     </form>
                     <hr />
                     {/* <a onClick={() => setAuthView('sign_up')}>Don't have an account? Sign up</a> */}
-                    <a onClick={() => setAuthView('sign_in')}>Already have an account? Sign in</a>
+                    <Button onClick={() => setAuthView('sign_in')}>Already have an account? Sign in</Button>
                     {/* <a onClick={() => setAuthView('magic_link')}>Send magic link email</a> */}
                 </>
             ) : authView === 'magic_link' ? (
                 <>
                     <h4>Magic link</h4>
                     <form onSubmit={handleMagicLinkSignIn}>
-                        <input
+                        <TextField
+                            id="magic__email"
                             label="Email address"
                             autoComplete="email"
-                            placeholder="Type in your email address"
+                            placeholder="okmeme@example.com"
                             defaultValue={email}
                             onChange={(e) => setEmail(e.target.value)}
+                            fullWidth
                             style={inputStyle}
                         />
-                        <button type="submit" style={buttonStyle}>Send magic link</button>
+                        <Button type="submit" fullWidth variant="contained">Send Magic Link</Button>
                     </form>
                     <hr />
                     {/* <a onClick={() => setAuthView('sign_up')}>Don't have an account? Sign up</a> */}
-                    <a onClick={() => setAuthView('sign_in')}>Already have an account? Sign in</a>
+                    <Button onClick={() => setAuthView('sign_in')}>Already have an account? Sign in</Button>
                 </>
             ) : authView === 'update_password' ? (
                 <>
@@ -217,16 +216,16 @@ function UpdatePassword({ supabaseClient }) {
             {message && <div style={{ color: 'green' }}>{message}</div>}
             <h4>Set a new password</h4>
             <form onSubmit={handlePasswordReset}>
-                <input
-                    label="New password"
-                    placeholder="Enter your new password"
+                <TextField
+                    id="sign-in__password"
+                    label="New Password"
                     type="password"
+                    defaultValue={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    fullWidth
                     style={inputStyle}
                 />
-                <button style={buttonStyle} type="submit">
-                    Update password
-                </button>
+                <Button type="submit" fullWidth variant="contained">Update Password</Button>
             </form>
         </>
     )

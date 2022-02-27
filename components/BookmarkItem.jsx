@@ -1,12 +1,14 @@
 import React from 'react';
+import Button from '@mui/material/Button';
 
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
-import BookmarkIcon from '@mui/icons-material/Bookmark';
 
 export function BookmarkItem(props) {
+    const { saved } = props;
+
     return (
-        <React.Fragment>
-            <BookmarkBorderIcon />
-        </React.Fragment>
+        <Button size="small" color="secondary">
+            <BookmarkBorderIcon />&nbsp;{saved > 0 ? saved : null}
+        </Button>
     )
 }

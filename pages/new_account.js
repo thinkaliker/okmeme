@@ -15,12 +15,13 @@ const fetcher = (url, token) =>
   }).then((res) => res.json())
 
   const Login = () => {
-    const { user, session } = useUser()
-    const { data, error } = useSWR(session ? ['/api/getUser', session.access_token] : null, fetcher)
-    const [authView, setAuthView] = useState('sign_up')
-
+    const { user, session } = useUser();
+    const { data, error } = useSWR(session ? ['/api/getUser', session.access_token] : null, fetcher);
+    
     const router = useRouter();
-    const { email } = router.query
+    const { email } = router.query;
+    const [authView, setAuthView] = useState('sign_up');
+    
   
     useEffect(() => {
       const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
@@ -56,33 +57,7 @@ const fetcher = (url, token) =>
         )
       else
         return (
-          <>
-            {authView === 'update_password' && <Auth.UpdatePassword supabaseClient={supabase} />}
-            {user && (
-              <>
-                <h4>You're signed in</h4>
-                <h5>Email: {user.email}</h5>
-    
-                <button type="outline" onClick={() => supabase.auth.signOut()}>
-                  Log out
-                </button>
-                <hr />
-                {error && <div style={{ color: 'red' }}>Failed to fetch user!</div>}
-                {data && !error ? (
-                  <>
-                    <div style={{ color: 'green' }}>
-                      User data retrieved server-side (in API route):
-                    </div>
-    
-                    <pre>{JSON.stringify(data, null, 2)}</pre>
-                  </>
-                ) : (
-                  <div>Loading...</div>
-                )}
-    
-              </>
-            )}
-          </>
+          <h2>Nope.</h2>
         )
     }
   
