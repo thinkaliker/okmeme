@@ -18,13 +18,11 @@ import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
 import ReportPanel from './ReportPanel';
 import LinkPreview from './LinkPreview';
 import { BookmarkItem } from './BookmarkItem';
+import { mediaTypes } from './consts/mediaTypes';
 
 function getHostname(url) {
   return new URL(url).host;
 }
-
-const drawerWidth = 240;
-
 
 export function LinkCard(props) {
   const theme = useTheme();
@@ -39,7 +37,7 @@ export function LinkCard(props) {
     setTextPreview(!textPreview);
   }
 
-  const { mediaType, mediaTypes, media, link, title, tags, saved, author, timestamp, text, loggedIn } = props;
+  const { mediaType, media, link, title, tags, saved, author, timestamp, text, loggedIn } = props;
 
   let shortLink = 'text';
   if (link !== '#') {

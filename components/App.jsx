@@ -15,13 +15,9 @@ import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import GradientIcon from '@mui/icons-material/Gradient';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import ChatIcon from '@mui/icons-material/Chat';
-import MovieIcon from '@mui/icons-material/Movie';
 import Brightness3Icon from '@mui/icons-material/Brightness3';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
-import PhotoIcon from '@mui/icons-material/Photo';
-import AudiotrackIcon from '@mui/icons-material/Audiotrack';
+
 
 import SidebarItem from './SidebarItem';
 import LoginNavbar from './LoginNavbar';
@@ -35,31 +31,7 @@ import TagSidebar from './TagSidebar';
 import LinkList from './LinkList';
 
 import { supabase } from '../utils/initSupabase';
-
-const drawerWidth = 240;
-
-const mediaTypes = {
-    'image': {
-        name: 'Image',
-        icon: <PhotoIcon />
-    },
-    'video': {
-        name: 'Video',
-        icon: <MovieIcon />
-    },
-    'audio': {
-        name: 'Audio',
-        icon: <AudiotrackIcon />
-    },
-    'url': {
-        name: 'URL',
-        icon: <OpenInNewIcon />
-    },
-    'text': {
-        name: 'Text',
-        icon: <ChatIcon />
-    }
-}
+import { drawerWidth } from './consts/layout';
 
 
 const openedMixin = (theme) => ({
@@ -127,8 +99,6 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
     }),
 );
 export default function App() {
-
-    // const {classes} = props;
 
     const [open, setOpen] = React.useState(true);
 
@@ -200,7 +170,7 @@ export default function App() {
                     }
                     <RulesSidebar />
                     {
-                        loggedIn ? <SubmitSidebar mediaTypes={mediaTypes} /> : <></>
+                        loggedIn ? <SubmitSidebar /> : <></>
                     }
                     <LoginSidebar supabase={supabase} loggedIn={loggedIn} />
                     <Divider />
@@ -209,7 +179,7 @@ export default function App() {
 
             </Drawer>
             <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-                <LinkList mediaTypes={mediaTypes} supabase={supabase} loggedIn={loggedIn} />
+                <LinkList supabase={supabase} loggedIn={loggedIn} />
             </Box>
         </Box>
     );

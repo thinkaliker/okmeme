@@ -8,7 +8,7 @@ import SubmitPanel from './SubmitPanel';
 
 
 export function SubmitSidebar(props) {
-  const { mediaTypes } = props;
+  // const { mediaTypes } = props;
   const [open, setOpen] = React.useState(false);
 
   function handleModalOpen() {
@@ -29,7 +29,7 @@ export function SubmitSidebar(props) {
         <ListItemIcon><AddBoxIcon /></ListItemIcon>
         <ListItemText sx={{ fontWeight: 500 }}>Submit</ListItemText>
       </ListItem>
-      <SubmitPanel open={open} handleModalClose={handleModalClose} mediaTypes={mediaTypes} />
+      <SubmitPanel open={open} handleModalClose={handleModalClose} />
     </React.Fragment>
   );
 

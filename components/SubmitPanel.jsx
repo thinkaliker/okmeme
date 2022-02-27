@@ -12,6 +12,7 @@ import Switch from '@mui/material/Switch';
 import Grid from '@mui/material/Grid';
 import { useTheme } from '@mui/material/styles';
 
+import { mediaTypes } from './consts/mediaTypes';
 
 const visibilityTypes = [
   'Public', 'Verified Only', 'Staff Only'
@@ -23,7 +24,7 @@ const submitterTypes = [
 
 export function SubmitPanel(props) {
 
-  const { handleModalClose, open, mediaTypes, linkType, tags, url, text, nsfw } = props;
+  const { handleModalClose, open, linkType, tags, url, text, nsfw } = props;
 
   // const [open, setOpen] = React.useState(false)
   const theme = useTheme();
