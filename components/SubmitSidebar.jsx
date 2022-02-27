@@ -2,14 +2,14 @@ import React from 'react';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import ListItemIcon from '@mui/material/ListItemIcon';
+import AddBoxIcon from '@mui/icons-material/AddBox';
 
 import SubmitPanel from './SubmitPanel';
 
 
 export function SubmitSidebar(props) {
-  const { extraButtons, mediaTypes } = props;
+  const { mediaTypes } = props;
   const [open, setOpen] = React.useState(false);
-  const sidebarIcon = extraButtons['submit'].icon;
 
   function handleModalOpen() {
     setOpen(true);
@@ -26,7 +26,7 @@ export function SubmitSidebar(props) {
         alignItems: 'center',
         paddingLeft: 2
       }} onClick={handleModalOpen}>
-        <ListItemIcon>{sidebarIcon}</ListItemIcon>
+        <ListItemIcon><AddBoxIcon /></ListItemIcon>
         <ListItemText sx={{ fontWeight: 500 }}>Submit</ListItemText>
       </ListItem>
       <SubmitPanel open={open} handleModalClose={handleModalClose} mediaTypes={mediaTypes} />

@@ -17,6 +17,7 @@ import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
 
 import ReportPanel from './ReportPanel';
 import LinkPreview from './LinkPreview';
+import { BookmarkItem } from './BookmarkItem';
 
 function getHostname(url) {
   return new URL(url).host;
@@ -38,7 +39,7 @@ export function LinkCard(props) {
     setTextPreview(!textPreview);
   }
 
-  const { mediaType, mediaTypes, categoryType, media, link, title, tags, points, author, timestamp, text } = props;
+  const { mediaType, mediaTypes, media, link, title, tags, saved, author, timestamp, text } = props;
 
   let shortLink = 'text';
   if (link !== '#') {
@@ -93,13 +94,13 @@ export function LinkCard(props) {
           }
         </CardActionArea>
         <CardActions>
-          <Button size="small" color="primary">
-            <ExpandLessIcon />&nbsp;{points > 0 ? points : null}
-          </Button>
           <Button size="small" color="secondary">
-            {/* hide name if not logged in */}
-            {author}
+            <BookmarkItem />&nbsp;{saved > 0 ? saved : null}
           </Button>
+          {/* <Button size="small" color="secondary"> */}
+          {/* hide name if not logged in */}
+          {/* {author} */}
+          {/* </Button> */}
           <Hidden xsDown>
             <Tooltip title={(new Date(parseInt({ timestamp }.timestamp)).toISOString())}>
               <Button size="small" color="primary">
@@ -112,14 +113,14 @@ export function LinkCard(props) {
             <div>
               {tags.map((tag, index) => (
                 <Button size="small" color="primary" key={title + tag + index}>
-                  #{tag}
+                  {tag}
                 </Button>
               ))
               }
             </div>
           </Hidden>
           <div style={{ flexGrow: 1 }}></div>
-          <ReportPanel />
+          {/* <ReportPanel /> */}
         </CardActions>
       </Card>
     </React.Fragment>

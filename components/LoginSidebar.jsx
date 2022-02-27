@@ -2,14 +2,14 @@ import React from 'react';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import ListItemIcon from '@mui/material/ListItemIcon';
+import InputIcon from '@mui/icons-material/Input';
 
 import LoginPanel from './LoginPanel';
 
 
-export function LoginSIdebar(props) {
-  const { classes, extraButtons } = props;
+export function LoginSidebar(props) {
+  const { supabase } = props;
   const [open, setOpen] = React.useState(false);
-  const sidebarIcon = extraButtons['login'].icon;
 
   function handleModalOpen() {
     setOpen(true);
@@ -26,13 +26,17 @@ export function LoginSIdebar(props) {
         alignItems: 'center',
         paddingLeft: 2
       }} onClick={handleModalOpen}>
-        <ListItemIcon>{sidebarIcon}</ListItemIcon>
-        <ListItemText sx={{ fontWeight: 500 }}>Login</ListItemText>
+        <ListItemIcon><InputIcon /></ListItemIcon>
+        <ListItemText sx={{ fontWeight: 500 }}>
+          {
+            supabase.auth.user() ? 'Logout' : 'Login'
+          }
+        </ListItemText>
       </ListItem>
-      <LoginPanel open={open} handleModalClose={handleModalClose} />
+      <LoginPanel supabase={supabase} open={open} handleModalClose={handleModalClose} />
     </React.Fragment>
   );
 
 }
 
-export default LoginSIdebar;
+export default LoginSidebar;

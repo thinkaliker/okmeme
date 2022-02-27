@@ -7,9 +7,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import { useTheme } from '@mui/material/styles';
 
 import useSWR from 'swr'
-import { supabase } from '../utils/initSupabase'
 import Auth from './Auth'
-// import { Auth, Space } from '@supabase/ui'
 import { useUser } from '../lib/UserContext'
 
 
@@ -31,7 +29,7 @@ const fetcher = (url, token) =>
 
 const LoginPanel = (props) => {
 
-  const { open, handleModalClose } = props;
+  const { open, handleModalClose, supabase } = props;
   const theme = useTheme();
   const { user, session } = useUser()
   const { data, error } = useSWR(session ? ['/api/getUser', session.access_token] : null, fetcher)
@@ -75,17 +73,17 @@ const LoginPanel = (props) => {
       >
         <DialogTitle>Login to OKMEME!</DialogTitle>
         <DialogContent>
-          {user ?
+          {supabase.auth.user() ?
             <>
               <h4>You're signed in</h4>
-              <h5>Email: {email}</h5>
+              <h5>Email: {supabase.auth.user().email}</h5>
 
               <button type="outline" style={buttonStyle} onClick={() => supabase.auth.signOut()}>
                 Log out
               </button>
             </>
             :
-            <div style={{ maxWidth: '520px', margin: '96px auto' }}>
+            <div style={{ maxWidth: '520px', margin: 'auto' }}>
               <Auth providedEmail={''} supabaseClient={supabase} authView={authView} setAuthView={setAuthView} />
             </div>
           }

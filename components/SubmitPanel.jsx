@@ -56,7 +56,7 @@ export function SubmitPanel(props) {
             //   }
             // }}
             value={mediaType}
-            helperText="Select Media Type"
+            helperText="Select Media Type (used for previews)"
             margin="normal"
           >
             {Object.keys(mediaTypes).map(option => (
@@ -72,13 +72,13 @@ export function SubmitPanel(props) {
             id="title"
             label="Title goes here"
             fullWidth
-            helperText="Enter a descriptive title or whatever"
+            helperText="Enter a descriptive title"
           />
           {/* type and autosuggest existing ones in category or add a new one  */}
           <TextField
             id="tags"
             label="Tagging"
-            helperText="Enter some tags"
+            helperText="Enter some tags, comma separated"
             fullWidth
           />
 
@@ -95,13 +95,13 @@ export function SubmitPanel(props) {
             fullWidth
             helperText="Enter URL"
           />
-          <TextField
+          {/* <TextField
             id="text"
             label="Text"
             fullWidth
             multiline
             helperText="Enter some text"
-          />
+          /> */}
 
           {/* highest visibility available based on role */}
           {/* <Grid
@@ -161,11 +161,12 @@ export function SubmitPanel(props) {
               control={
                 <Switch checked={nsfw} value="checkedA" />
               }
-              label="NSFW (Visible to registered users only)"
+              label="Restricted Visibility (required for NSFW)"
             />
           </FormGroup>
         </DialogContent>
         <DialogActions>
+
           <Button onClick={handleModalClose} color='secondary'>Cancel</Button>
           <Button onClick={handleModalClose} color='primary'>Submit</Button>
         </DialogActions>
