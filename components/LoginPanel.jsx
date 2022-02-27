@@ -29,7 +29,7 @@ const fetcher = (url, token) =>
 
 const LoginPanel = (props) => {
 
-  const { open, handleModalClose, supabase } = props;
+  const { open, handleModalClose, supabase, loggedIn } = props;
   const theme = useTheme();
   const { user, session } = useUser()
   const { data, error } = useSWR(session ? ['/api/getUser', session.access_token] : null, fetcher)
@@ -45,7 +45,10 @@ const LoginPanel = (props) => {
         handleModalClose()
         console.log('Signed in!')
       }
-    })
+      if (event === 'SIGNED_OUT') {
+        handleModalClose()
+      }
+    });
 
     return () => {
       authListener.unsubscribe()
@@ -73,7 +76,7 @@ const LoginPanel = (props) => {
       >
         <DialogTitle>Login to OKMEME!</DialogTitle>
         <DialogContent>
-          {supabase.auth.user() ?
+          {loggedIn ?
             <>
               <h4>You're signed in</h4>
               <h5>Email: {supabase.auth.user().email}</h5>

@@ -8,7 +8,7 @@ import LoginPanel from './LoginPanel';
 
 
 export function LoginSidebar(props) {
-  const { supabase } = props;
+  const { supabase, loggedIn } = props;
   const [open, setOpen] = React.useState(false);
 
   function handleModalOpen() {
@@ -29,11 +29,11 @@ export function LoginSidebar(props) {
         <ListItemIcon><InputIcon /></ListItemIcon>
         <ListItemText sx={{ fontWeight: 500 }}>
           {
-            supabase.auth.user() ? 'Logout' : 'Login'
+            loggedIn ? 'Logout' : 'Login'
           }
         </ListItemText>
       </ListItem>
-      <LoginPanel supabase={supabase} open={open} handleModalClose={handleModalClose} />
+      <LoginPanel supabase={supabase} loggedIn={loggedIn} open={open} handleModalClose={handleModalClose} />
     </React.Fragment>
   );
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useState, useEffect } from 'react';
 import { styled, useTheme, createTheme } from '@mui/material/styles';
 import MuiDrawer from '@mui/material/Drawer';
 import MuiAppBar from '@mui/material/AppBar';
@@ -131,6 +132,8 @@ export default function App() {
 
     const [open, setOpen] = React.useState(true);
 
+    const [loggedIn, setLoggedIn] = React.useState(false);
+
     const theme = useTheme();
 
     const handleDrawerOpen = () => {
@@ -141,7 +144,20 @@ export default function App() {
         setOpen(false);
     };
 
-    console.log(supabase.auth.user())
+    // console.log(supabase.auth.user())
+
+    useEffect(() => {
+        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN') {
+                setLoggedIn(true);
+            } else if (event === 'SIGNED_OUT') {
+                setLoggedIn(false);
+            }
+        });
+        return () => {
+            authListener.unsubscribe()
+        }
+    });
 
     // const themeIcon = !theme ? <Brightness7Icon /> : <Brightness3Icon /> 
 
@@ -180,13 +196,13 @@ export default function App() {
                 <List>
                     <SidebarItem item={{ name: 'All', icon: <GradientIcon /> }} />
                     {
-                        supabase.auth.user() ? <AdminSidebar /> : <></>
+                        loggedIn ? <AdminSidebar /> : <></>
                     }
                     <RulesSidebar />
                     {
-                        supabase.auth.user() ? <SubmitSidebar mediaTypes={mediaTypes} /> : <></>
+                        loggedIn ? <SubmitSidebar mediaTypes={mediaTypes} /> : <></>
                     }
-                    <LoginSidebar supabase={supabase} />
+                    <LoginSidebar supabase={supabase} loggedIn={loggedIn} />
                     <Divider />
                     <TagSidebar />
                 </List>
