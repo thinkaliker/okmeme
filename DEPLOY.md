@@ -236,7 +236,10 @@ git push -u origin main`.
 5. Expand **Build and Output Settings**. Leave everything as it is — the
    `api/vercel.json` in the repository already sets the build command to
    `prisma generate`, and its rewrite sends every path to one function so Hono
-   does the routing instead of the filesystem.
+   does the routing instead of the filesystem. It also points the output
+   directory at an empty `public` folder the build creates. Vercel insists on
+   one, and leaving the API with no static files keeps it from serving the
+   source tree. Never set the output directory to `.`.
 6. **Do not click Deploy yet.** Expand **Environment Variables** first and do
    step A5.
 
