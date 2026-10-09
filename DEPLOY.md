@@ -302,6 +302,7 @@ Expected output:
 
 ```text
 migrations: applied 0001_init.sql
+migrations: applied 0002_thumbnails_setting.sql
 ```
 
 If you see `already up to date`, the schema was already there — that is fine and
@@ -1086,6 +1087,15 @@ submission, so posts made while thumbnails were off need `backfill-thumbs`.
 
 You are on a direct connection string, not a pooled one. Go back to
 [A1](#a1-create-the-database) step 5.
+
+### `npm run migrate` fails with `Transaction not found`
+
+The migration ran past Prisma's transaction time limit. Each file is applied in
+one transaction, one statement per round trip, so a slow link to a hosted
+database, or a Neon compute waking from suspend, can push it over. The runner
+now allows five minutes. If you still hit it, check that you are running the
+current code. Nothing is half-applied: the transaction rolled back, so run it
+again.
 
 ### `error: type "citext" does not exist`
 

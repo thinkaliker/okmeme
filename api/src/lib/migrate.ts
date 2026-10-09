@@ -106,10 +106,17 @@ export async function migrate(directory = MIGRATIONS_DIR): Promise<string[]> {
     const sql = await readFile(join(directory, file), 'utf8');
     const statements = splitStatements(sql);
 
-    await db.$transaction(async (tx) => {
-      for (const statement of statements) await tx.$executeRawUnsafe(statement);
-      await tx.$executeRawUnsafe('INSERT INTO _migrations (name) VALUES ($1)', file);
-    });
+    // Prisma closes an interactive transaction after 5s by default, and a file
+    // of seventy statements, one round trip each, run from a laptop against a
+    // hosted database takes longer than that. The commit then fails with
+    // "Transaction not found". Migrations only run from the CLI, so wait.
+    await db.$transaction(
+      async (tx) => {
+        for (const statement of statements) await tx.$executeRawUnsafe(statement);
+        await tx.$executeRawUnsafe('INSERT INTO _migrations (name) VALUES ($1)', file);
+      },
+      { maxWait: 30_000, timeout: 300_000 },
+    );
 
     ran.push(file);
   }
