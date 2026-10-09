@@ -1,0 +1,10 @@
+{
+  // Type checking covers what the build does not emit: the Vercel entry point
+  // and the test suite. `npm run typecheck` uses this; `npm run build` does not.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "api/**/*.ts", "test/**/*.ts"]
+}

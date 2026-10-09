@@ -1,0 +1,154 @@
+@import 'tailwindcss';
+
+/* Dark mode is a class on <html>, set by the pre-paint script in index.html and
+   thereafter by ThemeProvider. The default is prefers-color-scheme; an explicit
+   choice is persisted and wins. */
+@custom-variant dark (&:is(.dark *));
+
+/* Density is a root attribute rather than a prop threaded through the tree, so a
+   component says `compact:py-1` next to its own padding and there is nothing to
+   forget to pass down. Both are set before first paint by index.html. */
+@custom-variant compact (&:is([data-density='compact'] *));
+
+:root {
+  --radius: 0.5rem;
+
+  --background: oklch(0.99 0.002 90);
+  --foreground: oklch(0.21 0.006 285);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.006 285);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.006 285);
+  --primary: oklch(0.68 0.168 55);
+  --primary-foreground: oklch(0.16 0.02 55);
+  --secondary: oklch(0.96 0.004 90);
+  --secondary-foreground: oklch(0.28 0.006 285);
+  --muted: oklch(0.96 0.004 90);
+  --muted-foreground: oklch(0.52 0.008 285);
+  --accent: oklch(0.95 0.02 60);
+  --accent-foreground: oklch(0.28 0.02 60);
+  --destructive: oklch(0.58 0.21 27);
+  --destructive-foreground: oklch(0.98 0.005 90);
+  --border: oklch(0.9 0.004 285);
+  --input: oklch(0.9 0.004 285);
+  --ring: oklch(0.68 0.168 55);
+
+  /* Tier chrome. A tier label is a security boundary rendered as a word, so it
+     gets one deliberate token rather than an ad-hoc colour per component. */
+  --tier: oklch(0.55 0.03 285);
+  --tier-foreground: oklch(0.98 0.002 90);
+  --nsfw: oklch(0.55 0.19 12);
+
+  /* Per-item tint. Components supply a hue; lightness and chroma live here so
+     one seed reads correctly in both themes. See src/lib/tint.ts for what may
+     and may not be used as a seed. */
+  --tint-dot-l: 68%;
+  --tint-dot-c: 0.11;
+  --tint-edge-l: 58%;
+  --tint-edge-c: 0.11;
+  --tint-chip-l: 62%;
+  --tint-chip-c: 0.09;
+  --tint-chip-fg: oklch(0.99 0 0);
+}
+
+.dark {
+  --background: oklch(0.17 0.004 285);
+  --foreground: oklch(0.95 0.002 90);
+  --card: oklch(0.21 0.005 285);
+  --card-foreground: oklch(0.95 0.002 90);
+  --popover: oklch(0.21 0.005 285);
+  --popover-foreground: oklch(0.95 0.002 90);
+  --primary: oklch(0.72 0.17 57);
+  --primary-foreground: oklch(0.17 0.03 57);
+  --secondary: oklch(0.26 0.005 285);
+  --secondary-foreground: oklch(0.95 0.002 90);
+  --muted: oklch(0.26 0.005 285);
+  --muted-foreground: oklch(0.68 0.008 285);
+  --accent: oklch(0.3 0.02 57);
+  --accent-foreground: oklch(0.93 0.02 57);
+  --destructive: oklch(0.62 0.2 25);
+  --destructive-foreground: oklch(0.97 0.005 90);
+  --border: oklch(0.3 0.005 285);
+  --input: oklch(0.32 0.005 285);
+  --ring: oklch(0.72 0.17 57);
+
+  --tier: oklch(0.62 0.03 285);
+  --tier-foreground: oklch(0.17 0.004 285);
+  --nsfw: oklch(0.62 0.19 14);
+
+  --tint-dot-l: 72%;
+  --tint-dot-c: 0.12;
+  --tint-edge-l: 64%;
+  --tint-edge-c: 0.13;
+  --tint-chip-l: 62%;
+  --tint-chip-c: 0.11;
+  --tint-chip-fg: oklch(0.16 0.01 285);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-tier: var(--tier);
+  --color-tier-foreground: var(--tier-foreground);
+  --color-nsfw: var(--nsfw);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+}
+
+/* The tint itself is applied inline from src/lib/tint.ts — a class here would
+   sit in the components layer and lose to any utility on the same element. Only
+   the theme-dependent halves of the colour live in this file. */
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Accessibility is a requirement, not a later pass: every interactive element
+     keeps a visible focus ring, and nothing is allowed to remove it. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

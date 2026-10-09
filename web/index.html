@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- nothing about okmeme is indexable; see DESIGN.md -->
+    <meta name="robots" content="noindex, nofollow, noarchive, noimageindex" />
+    <meta name="referrer" content="no-referrer" />
+    <!-- generated from okmeme.png by `npm run icons` -->
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" href="/icon.png" type="image/png" sizes="512x512" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>okmeme</title>
+    <script>
+      // Applied before first paint, so the page never flashes the wrong theme
+      // and a compact or wide layout does not arrive as a reflow.
+      (function () {
+        var root = document.documentElement;
+        try {
+          var stored = localStorage.getItem('okmeme.theme');
+          var dark =
+            stored === 'dark' ||
+            ((stored === null || stored === 'system') &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          root.classList.toggle('dark', dark);
+          root.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (_) {}
+        try {
+          var display = JSON.parse(localStorage.getItem('okmeme.display') || '{}');
+          root.dataset.density = display.density === 'compact' ? 'compact' : 'comfortable';
+          root.dataset.width = display.width === 'wide' ? 'wide' : 'normal';
+        } catch (_) {
+          root.dataset.density = 'comfortable';
+          root.dataset.width = 'normal';
+        }
+      })();
+    </script>
+  </head>
+  <body class="h-full">
+    <div id="root" class="h-full"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

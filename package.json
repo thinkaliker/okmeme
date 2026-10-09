@@ -2,36 +2,19 @@
   "name": "okmeme",
   "version": "0.1.0",
   "private": true,
-  "dependencies": {
-    "@material-ui/core": "^4.9.0",
-    "@material-ui/icons": "^4.5.1",
-    "classnames": "^2.2.6",
-    "create-react-app": "^4.0.2",
-    "prop-types": "^15.7.2",
-    "react": "17.0.1",
-    "react-dom": "^17.0.1",
-    "react-scripts": "4.0.2",
-    "react-timeago": "^5.2.0"
+  "description": "A linkdump built around a semi-anonymous tiered community.",
+  "engines": {
+    "node": ">=20"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": "react-app"
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+    "install:all": "npm install --prefix api && npm install --prefix web",
+    "dev:api": "npm --prefix api run dev",
+    "dev:web": "npm --prefix web run dev",
+    "build": "npm --prefix api run build && npm --prefix web run build",
+    "test": "npm --prefix api run test && npm --prefix web run test",
+    "typecheck": "npm --prefix api run typecheck && npm --prefix web run typecheck",
+    "migrate": "npm --prefix api run migrate",
+    "init": "npm --prefix api run init",
+    "icons": "npm --prefix web run icons"
   }
 }

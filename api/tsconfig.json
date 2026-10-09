@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "rootDir": "src",
+    "outDir": "dist",
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  // Build output is the Node server only: `dist/server.js` and `dist/cli.js`.
+  // Vercel compiles `api/index.ts` itself and never looks at dist, and the
+  // tests are checked by tsconfig.check.json rather than emitted.
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules"]
+}

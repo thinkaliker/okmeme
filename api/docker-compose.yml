@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: okmeme
+      POSTGRES_PASSWORD: okmeme
+      POSTGRES_DB: okmeme
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U okmeme']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - '5432:5432'
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://okmeme:okmeme@db:5432/okmeme
+      PUBLIC_URL: http://localhost:8787
+      WEB_ORIGIN: http://localhost:5173
+      AUTH_PROVIDER: local
+      BLOB_STORE: local-fs
+      BLOB_DIR: /app/.blobs
+      NODE_ENV: production
+      COOKIE_SECURE: 'false'
+      # Set IP_SALT to something private before exposing this to a network.
+      IP_SALT: change-me
+    volumes:
+      - blobs:/app/.blobs
+    ports:
+      - '8787:8787'
+
+volumes:
+  pgdata:
+  blobs:

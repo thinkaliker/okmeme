@@ -1,0 +1,434 @@
+// Prisma is the client, not the migration tool.
+//
+// The schema of record is ../migrations/*.sql — hand-written because three
+// things Prisma Migrate cannot express are load-bearing here: the partial
+// unique index that allows one open recovery request per account, the
+// append-only trigger on audit_log, and the tsvector kept current from two
+// tables. `npm run migrate` applies those; this file exists so the rest of the
+// codebase gets a typed client over the same tables.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserState {
+  active
+  deleted
+
+  @@map("user_state")
+}
+
+enum LinkKind {
+  link
+  text
+  media
+
+  @@map("link_kind")
+}
+
+enum MediaType {
+  image
+  video
+  audio
+
+  @@map("media_type")
+}
+
+enum TagStatus {
+  approved
+  pending
+
+  @@map("tag_status")
+}
+
+enum SuspensionType {
+  mute
+  submission_ban
+  lockout
+  content_hold
+
+  @@map("suspension_type")
+}
+
+enum ReasonCategory {
+  spam
+  abuse
+  nsfw
+  other
+
+  @@map("reason_category")
+}
+
+enum AppealOutcome {
+  upheld
+  reduced
+  overturned
+
+  @@map("appeal_outcome")
+}
+
+enum SubjectType {
+  link
+  comment
+  user
+
+  @@map("subject_type")
+}
+
+enum ReportStatus {
+  open
+  resolved
+
+  @@map("report_status")
+}
+
+enum NotificationKind {
+  sanction
+  content_removed
+  content_retiered
+  tier_changed
+  appeal_resolved
+  recovery_approved
+
+  @@map("notification_kind")
+}
+
+model User {
+  id        BigInt    @id @default(autoincrement())
+  publicId  String    @unique @map("public_id")
+  /// citext in Postgres. Prisma has no citext type and does not own these
+  /// migrations, so it is declared as text and read as a string.
+  username  String?   @unique
+  tier      Int       @db.SmallInt
+  state     UserState @default(active)
+  showNsfw  Boolean   @default(false) @map("show_nsfw")
+  theme     String    @default("system")
+  display   Json      @default("{}")
+  invitedBy BigInt?   @map("invited_by")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  inviter          User?             @relation("Invited", fields: [invitedBy], references: [id])
+  invitees         User[]            @relation("Invited")
+  identities       Identity[]
+  sessions         Session[]
+  apiTokens        ApiToken[]
+  recoveryCodes    RecoveryCode[]
+  recoveryRequests RecoveryRequest[] @relation("RecoverySubject")
+  links            Link[]            @relation("LinkAuthor")
+  bookmarks        Bookmark[]
+  votes            Vote[]
+  notifications    Notification[]
+  suspensions      Suspension[]      @relation("SuspensionSubject")
+  appeals          Appeal[]          @relation("AppealSubject")
+
+  @@map("users")
+}
+
+model Identity {
+  id           BigInt   @id @default(autoincrement())
+  userId       BigInt   @map("user_id")
+  provider     String
+  subject      String
+  passwordHash String?  @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, subject])
+  @@map("identities")
+}
+
+model Session {
+  id        BigInt    @id @default(autoincrement())
+  userId    BigInt    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model ApiToken {
+  id         BigInt    @id @default(autoincrement())
+  userId     BigInt    @map("user_id")
+  publicId   String    @unique @map("public_id")
+  tokenHash  String    @unique @map("token_hash")
+  name       String
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_tokens")
+}
+
+model RecoveryCode {
+  id        BigInt    @id @default(autoincrement())
+  userId    BigInt    @map("user_id")
+  codeHash  String    @map("code_hash")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("recovery_codes")
+}
+
+model RecoveryRequest {
+  id         BigInt    @id @default(autoincrement())
+  userId     BigInt    @map("user_id")
+  note       String    @default("")
+  ipHash     String?   @map("ip_hash")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  resolvedBy BigInt?   @map("resolved_by")
+  resolvedAt DateTime? @map("resolved_at") @db.Timestamptz(6)
+
+  user User @relation("RecoverySubject", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("recovery_requests")
+}
+
+model Invite {
+  id         BigInt    @id @default(autoincrement())
+  codeHash   String    @unique @map("code_hash")
+  issuedBy   BigInt    @map("issued_by")
+  issuedAt   DateTime  @default(now()) @map("issued_at") @db.Timestamptz(6)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedBy BigInt?   @map("consumed_by")
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  note       String?
+
+  @@map("invites")
+}
+
+model Category {
+  id        BigInt   @id @default(autoincrement())
+  slug      String   @unique
+  name      String
+  createdBy BigInt?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  links Link[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id        BigInt    @id @default(autoincrement())
+  slug      String    @unique
+  name      String
+  status    TagStatus @default(approved)
+  createdBy BigInt?   @map("created_by")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  linkTags LinkTag[]
+
+  @@map("tags")
+}
+
+model Link {
+  id               BigInt     @id @default(autoincrement())
+  publicId         String     @unique @map("public_id")
+  kind             LinkKind
+  url              String?
+  urlCanonical     String?    @map("url_canonical")
+  mediaType        MediaType? @map("media_type")
+  title            String
+  body             String?
+  host             String?
+  thumbKey         String?    @map("thumb_key")
+  faviconKey       String?    @map("favicon_key")
+  categoryId       BigInt     @map("category_id")
+  authorId         BigInt     @map("author_id")
+  authorTierAtPost Int        @map("author_tier_at_post") @db.SmallInt
+  pinnedTier       Int?       @map("pinned_tier") @db.SmallInt
+  isNsfw           Boolean    @default(false) @map("is_nsfw")
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  editedAt         DateTime?  @map("edited_at") @db.Timestamptz(6)
+  removedAt        DateTime?  @map("removed_at") @db.Timestamptz(6)
+  removedReason    String?    @map("removed_reason")
+
+  /// Maintained by trigger from links and link_tags. Never selected.
+  searchVec Unsupported("tsvector")? @map("search_vec")
+
+  category  Category       @relation(fields: [categoryId], references: [id])
+  author    User           @relation("LinkAuthor", fields: [authorId], references: [id])
+  linkTags  LinkTag[]
+  votes     Vote[]
+  bookmarks Bookmark[]
+  revisions LinkRevision[]
+  score     LinkScore?
+
+  @@map("links")
+}
+
+model LinkRevision {
+  id        BigInt   @id @default(autoincrement())
+  linkId    BigInt   @map("link_id")
+  seq       Int
+  title     String
+  body      String?
+  editorId  BigInt   @map("editor_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  link Link @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@unique([linkId, seq])
+  @@map("link_revisions")
+}
+
+model LinkTag {
+  linkId BigInt @map("link_id")
+  tagId  BigInt @map("tag_id")
+
+  link Link @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([linkId, tagId])
+  @@map("link_tags")
+}
+
+model Vote {
+  linkId    BigInt   @map("link_id")
+  userId    BigInt   @map("user_id")
+  value     Int      @db.SmallInt
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  link Link @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([linkId, userId])
+  @@map("votes")
+}
+
+model LinkScore {
+  linkId    BigInt   @id @map("link_id")
+  score     Int      @default(0)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  link Link @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@map("link_scores")
+}
+
+model Bookmark {
+  userId    BigInt   @map("user_id")
+  linkId    BigInt   @map("link_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  link Link @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@id([userId, linkId])
+  @@map("bookmarks")
+}
+
+model Notification {
+  id        BigInt           @id @default(autoincrement())
+  publicId  String           @unique @map("public_id")
+  userId    BigInt           @map("user_id")
+  kind      NotificationKind
+  payload   Json             @default("{}")
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  readAt    DateTime?        @map("read_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Report {
+  id          BigInt       @id @default(autoincrement())
+  publicId    String       @unique @map("public_id")
+  subjectType SubjectType  @map("subject_type")
+  subjectId   BigInt       @map("subject_id")
+  reporterId  BigInt?      @map("reporter_id")
+  reason      String
+  note        String?
+  status      ReportStatus @default(open)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  resolvedBy  BigInt?      @map("resolved_by")
+  resolvedAt  DateTime?    @map("resolved_at") @db.Timestamptz(6)
+  resolution  String?
+
+  @@map("reports")
+}
+
+model Suspension {
+  id             BigInt           @id @default(autoincrement())
+  publicId       String           @unique @map("public_id")
+  userId         BigInt           @map("user_id")
+  types          SuspensionType[]
+  expiresAt      DateTime?        @map("expires_at") @db.Timestamptz(6)
+  reasonCategory ReasonCategory   @map("reason_category")
+  note           String?
+  createdBy      BigInt           @map("created_by")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  liftedBy       BigInt?          @map("lifted_by")
+  liftedAt       DateTime?        @map("lifted_at") @db.Timestamptz(6)
+
+  user   User    @relation("SuspensionSubject", fields: [userId], references: [id], onDelete: Cascade)
+  appeal Appeal?
+
+  @@map("suspensions")
+}
+
+model Appeal {
+  id           BigInt         @id @default(autoincrement())
+  publicId     String         @unique @map("public_id")
+  suspensionId BigInt         @unique @map("suspension_id")
+  userId       BigInt         @map("user_id")
+  body         String
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  resolvedBy   BigInt?        @map("resolved_by")
+  resolvedAt   DateTime?      @map("resolved_at") @db.Timestamptz(6)
+  outcome      AppealOutcome?
+  outcomeNote  String?        @map("outcome_note")
+
+  suspension Suspension @relation(fields: [suspensionId], references: [id], onDelete: Cascade)
+  user       User       @relation("AppealSubject", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("appeals")
+}
+
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  actorId     BigInt?  @map("actor_id")
+  action      String
+  subjectType String   @map("subject_type")
+  subjectId   String?  @map("subject_id")
+  before      Json?
+  after       Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("audit_log")
+}
+
+model Setting {
+  key           String   @id
+  value         Json
+  minWriterTier Int      @default(4) @map("min_writer_tier") @db.SmallInt
+  updatedBy     BigInt?  @map("updated_by")
+  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("settings")
+}
+
+model RateLimit {
+  key         String   @id
+  windowStart DateTime @map("window_start") @db.Timestamptz(6)
+  count       Int
+
+  @@map("rate_limits")
+}
