@@ -327,6 +327,24 @@ When it finishes you get a URL like `okmeme-api-abc123.vercel.app`. Check it:
 curl https://okmeme-api-abc123.vercel.app/health
 ```
 
+> **Getting a Vercel login page instead?** New projects have **Vercel
+> Authentication** on by default (Settings → **Deployment Protection**,
+> "Standard Protection"). It covers every URL except your production domains,
+> and that includes this deployment URL. Leave it on: every branch you push
+> gets a preview deployment with the same `DATABASE_URL` and `SETUP_TOKEN`,
+> and those should not be public. Check through it with your Vercel login
+> instead, from the `api` folder:
+>
+> ```sh
+> npx vercel login
+> npx vercel link            # once; pick okmeme-api
+> npx vercel curl /health    # the project's current production deployment
+> ```
+>
+> Or open the URL in a browser where you are signed in to Vercel. The custom
+> domain you attach in [A10](#a10-attach-your-domains) is a production domain,
+> so it is public, and that is the one the web app talks to.
+
 Expected:
 
 ```json
