@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - /api
+      - /web
+    schedule:
+      interval: daily
+
+  # The api's Dockerfile base image (node:22-bookworm-slim).
+  - package-ecosystem: docker
+    directory: /api
+    schedule:
+      interval: daily
+
+  # The postgres image in api/docker-compose.yml. A major Postgres version
+  # cannot read the previous major's data directory, so those bumps need a
+  # dump and restore and are left to be done by hand.
+  - package-ecosystem: docker-compose
+    directory: /api
+    schedule:
+      interval: daily
+    ignore:
+      - dependency-name: postgres
+        update-types:
+          - version-update:semver-major
