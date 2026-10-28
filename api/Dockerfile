@@ -4,7 +4,7 @@
 # sharp and @aws-sdk/client-s3 are optional dependencies: they install here, and
 # a deployment that uses neither simply never loads them.
 
-FROM node:22-bookworm-slim AS build
+FROM node:25-bookworm-slim AS build
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
@@ -19,7 +19,7 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npx tsc -p tsconfig.json
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:25-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
