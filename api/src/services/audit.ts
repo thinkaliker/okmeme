@@ -23,6 +23,8 @@ export type AuditAction =
   | 'tag.approved'
   | 'tag.rejected'
   | 'category.created'
+  | 'category.renamed'
+  | 'category.deleted'
   | 'invite.issued'
   | 'invite.revoked'
   | 'invite.consumed'

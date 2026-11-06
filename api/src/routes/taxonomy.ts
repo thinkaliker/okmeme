@@ -52,6 +52,94 @@ export function taxonomyRoutes(): Hono<AppEnv> {
     return c.json(categoryPayload(created.slug, created.name), 201);
   });
 
+  /**
+   * Rename. **The slug never changes**: it is the `/c/:slug` URL people have
+   * bookmarked, and it is what a category's colour is derived from, so a rename
+   * that moved it would break links and repaint the nav for everyone.
+   */
+  app.patch('/categories/:slug', async (c) => {
+    const user = requireTier(c.get('viewer'), TIER.admin);
+
+    const body = z
+      .object({ name: z.string().trim().min(1).max(48) })
+      .safeParse(await c.req.json().catch(() => ({})));
+    if (!body.success) throw invalid('a category needs a name', 'invalid_body');
+
+    const slug = c.req.param('slug');
+    const existing = await db.category.findUnique({ where: { slug } });
+    if (existing === null) throw notFound('no such category');
+
+    const updated = await db.category.update({
+      where: { id: existing.id },
+      data: { name: body.data.name },
+    });
+    await audit({
+      actorId: user.id,
+      action: 'category.renamed',
+      subjectType: 'category',
+      subjectId: slug,
+      before: { name: existing.name },
+      after: { name: updated.name },
+    });
+
+    return c.json(categoryPayload(updated.slug, updated.name));
+  });
+
+  /**
+   * Delete. A link has exactly one category and the column is NOT NULL, so a
+   * category that still holds links can only go if they go somewhere else:
+   * `move_to` names the category that receives them. Removed links count — they
+   * still reference the row.
+   *
+   * `?move_to=` rather than a body, because a DELETE body is something proxies
+   * are allowed to drop.
+   */
+  app.delete('/categories/:slug', async (c) => {
+    const user = requireTier(c.get('viewer'), TIER.admin);
+
+    const rawMoveTo = c.req.query('move_to')?.trim();
+    const moveTo = rawMoveTo === undefined || rawMoveTo === '' ? undefined : rawMoveTo;
+
+    const slug = c.req.param('slug');
+    if (moveTo === slug) throw invalid('cannot move links into the category being deleted', 'bad_target');
+
+    const moved = await db.$transaction(async (tx) => {
+      const source = await tx.category.findUnique({ where: { slug } });
+      if (source === null) throw notFound('no such category');
+
+      // FOR UPDATE conflicts with the KEY SHARE lock an inserting link takes on
+      // the row it references, so no link can land in this category between
+      // the move below and the delete after it.
+      await tx.$queryRaw`SELECT id FROM categories WHERE id = ${source.id} FOR UPDATE`;
+
+      const inUse = (await tx.link.findFirst({ where: { categoryId: source.id }, select: { id: true } })) !== null;
+
+      let target: { id: bigint; slug: string } | null = null;
+      if (inUse) {
+        if (moveTo === undefined) {
+          throw conflict('category_in_use', 'that category still has links; choose where to move them');
+        }
+        target = await tx.category.findUnique({ where: { slug: moveTo }, select: { id: true, slug: true } });
+        if (target === null) throw invalid('no such category to move links into', 'bad_target');
+        await tx.link.updateMany({ where: { categoryId: source.id }, data: { categoryId: target.id } });
+      }
+
+      await tx.category.delete({ where: { id: source.id } });
+      return { name: source.name, movedTo: target?.slug ?? null };
+    });
+
+    await audit({
+      actorId: user.id,
+      action: 'category.deleted',
+      subjectType: 'category',
+      subjectId: slug,
+      before: { slug, name: moved.name },
+      after: { movedTo: moved.movedTo },
+    });
+
+    return c.body(null, 204);
+  });
+
   /* -------------------------------------------------------------- tags */
 
   app.get('/tags', async (c) => {

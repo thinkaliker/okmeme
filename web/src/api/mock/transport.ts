@@ -20,7 +20,7 @@ import {
   type Sanction,
   type ThemePreference,
 } from '@/domain/user';
-import { isValidTagSlug, toTagSlug } from '@/lib/slug';
+import { isValidTagSlug, toCategorySlug, toTagSlug } from '@/lib/slug';
 import {
   ANONYMOUS,
   TIER,
@@ -94,6 +94,7 @@ interface State {
   prefs: Map<number, Prefs>;
   approvedTags: Tag[];
   proposals: Map<string, Proposal>;
+  categories: Category[];
   nextId: number;
 }
 
@@ -109,6 +110,7 @@ const state: State = {
   prefs: new Map(),
   approvedTags: MOCK_TAGS.map((tag) => ({ ...tag, pending: false })),
   proposals: new Map(),
+  categories: [...MOCK_CATEGORIES],
   nextId: 1000,
 };
 
@@ -205,7 +207,7 @@ function viewerShowsNsfw(): boolean {
 
 function categoryOf(slug: string): Category {
   return (
-    MOCK_CATEGORIES.find((c) => c.slug === slug) ?? {
+    state.categories.find((c) => c.slug === slug) ?? {
       slug,
       nameKey: `category.${slug}`,
       name: slug,
@@ -558,6 +560,13 @@ function requireUser(): MockUser {
   return user;
 }
 
+/** `requireTier(viewer, TIER.admin)`: admins and owners, like the server. */
+function requireAdmin(): MockUser {
+  const user = requireUser();
+  if (user.tier < TIER.admin) throw new ApiError(403, 'forbidden', 'admin only');
+  return user;
+}
+
 function findRow(publicId: string): Row {
   const row = state.rows.find((r) => r.publicId === publicId);
   if (row === undefined) throw new ApiError(404, 'not_found', 'no such link');
@@ -604,7 +613,72 @@ function handle(method: Method, path: string, options: RequestOptions): unknown 
     return paginate(rows, byNew, query);
   }
 
-  if (method === 'GET' && path === '/categories') return MOCK_CATEGORIES;
+  if (method === 'GET' && path === '/categories') return state.categories;
+
+  /*
+   * The category editor. Unlike the moderation queues below, this one is
+   * modelled: an edit here changes what the nav and the submit form show, and
+   * deleting has a rule worth exercising — a category with links needs
+   * somewhere to move them.
+   */
+  if (method === 'GET' && path === '/admin/categories') {
+    requireAdmin();
+    return {
+      items: state.categories.map((category) => ({
+        ...category,
+        inUse: state.rows.some((row) => row.categorySlug === category.slug),
+        createdAt: isoFromMinutes(60 * 24 * 30),
+      })),
+      nextCursor: null,
+    };
+  }
+
+  if (method === 'POST' && path === '/categories') {
+    requireAdmin();
+    const name = String((options.body as { name?: unknown } | undefined)?.name ?? '').trim();
+    if (name === '' || name.length > 48) throw new ApiError(400, 'invalid_body', 'a category needs a name');
+    const slug = toCategorySlug(name);
+    if (slug === '') throw new ApiError(400, 'bad_slug', 'that name has no usable slug');
+    if (state.categories.some((c) => c.slug === slug)) {
+      throw new ApiError(409, 'category_exists', 'that category already exists');
+    }
+    const created: Category = { slug, nameKey: `category.${slug}`, name };
+    state.categories = [...state.categories, created];
+    return created;
+  }
+
+  const categoryMatch = /^\/categories\/([^/]+)$/.exec(path);
+  if (categoryMatch?.[1] !== undefined && (method === 'PATCH' || method === 'DELETE')) {
+    requireAdmin();
+    const slug = categoryMatch[1];
+    const existing = state.categories.find((c) => c.slug === slug);
+    if (existing === undefined) throw new ApiError(404, 'not_found', 'no such category');
+
+    if (method === 'PATCH') {
+      const name = String((options.body as { name?: unknown } | undefined)?.name ?? '').trim();
+      if (name === '' || name.length > 48) throw new ApiError(400, 'invalid_body', 'a category needs a name');
+      // The slug never moves: it is the URL, and the colour is derived from it.
+      const renamed: Category = { ...existing, name };
+      state.categories = state.categories.map((c) => (c.slug === slug ? renamed : c));
+      return renamed;
+    }
+
+    const moveTo = (query?.['move_to'] as string | undefined)?.trim() || undefined;
+    if (moveTo === slug) throw new ApiError(400, 'bad_target', 'cannot move links into the category being deleted');
+    if (state.rows.some((row) => row.categorySlug === slug)) {
+      if (moveTo === undefined) {
+        throw new ApiError(409, 'category_in_use', 'that category still has links; choose where to move them');
+      }
+      if (!state.categories.some((c) => c.slug === moveTo)) {
+        throw new ApiError(400, 'bad_target', 'no such category to move links into');
+      }
+      state.rows = state.rows.map((row) =>
+        row.categorySlug === slug ? { ...row, categorySlug: moveTo } : row,
+      );
+    }
+    state.categories = state.categories.filter((c) => c.slug !== slug);
+    return null;
+  }
 
   if (method === 'GET' && path === '/tags') {
     const user = currentUser();
@@ -786,6 +860,28 @@ function handle(method: Method, path: string, options: RequestOptions): unknown 
    * ---------------------------------------------------------------- */
 
   const EMPTY_PAGE = { items: [], nextCursor: null };
+
+  // The account list is not a queue — it is the fixture itself, and listing it
+  // lets the tier legend and the read-only owner/admin/self rows be seen
+  // without a server. Changing a tier still answers 501 below.
+  if (method === 'GET' && path === '/admin/users') {
+    requireAdmin();
+    const q = ((query?.['q'] as string | undefined) ?? '').toLowerCase();
+    return {
+      items: MOCK_USERS.filter((u) => u.username.includes(q))
+        .sort((a, b) => b.id - a.id)
+        .map((u) => ({
+          publicId: u.publicId,
+          username: u.username,
+          tier: u.tier,
+          state: 'active',
+          createdAt: isoFromMinutes(60 * 24 * u.id),
+          invitedBy: null,
+          sanction: null,
+        })),
+      nextCursor: null,
+    };
+  }
 
   if (method === 'GET' && /^\/admin\/(reports|appeals|recovery-requests|users|invites|audit|suspensions\/indefinite)$/.test(path)) {
     if (currentTier() < TIER.admin) throw new ApiError(403, 'forbidden', 'admin only');

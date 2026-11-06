@@ -12,6 +12,7 @@ import type {
 } from '@/domain/link';
 import type {
   AdminAppeal,
+  AdminCategory,
   AdminInvite,
   AdminRecoveryRequest,
   AdminReport,
@@ -99,6 +100,28 @@ export const links = {
 export const taxonomy = {
   categories(extra?: Signal): Promise<readonly Category[]> {
     return transport.request<readonly Category[]>('GET', '/categories', options(undefined, extra));
+  },
+
+  /** Admin. The slug is derived from the name and never changes afterwards. */
+  createCategory(name: string): Promise<Category> {
+    return transport.request<Category>('POST', '/categories', { body: { name } });
+  },
+
+  /** Admin. Renames the display name only; the slug (and so the URL) stays put. */
+  renameCategory(slug: string, name: string): Promise<Category> {
+    return transport.request<Category>('PATCH', `/categories/${slug}`, { body: { name } });
+  },
+
+  /**
+   * Admin. A category that still holds links needs `moveTo`, the slug that
+   * receives them; without it the server answers 409 `category_in_use`.
+   */
+  deleteCategory(slug: string, moveTo?: string): Promise<void> {
+    return transport.request<void>(
+      'DELETE',
+      `/categories/${slug}`,
+      moveTo === undefined ? {} : { query: { move_to: moveTo } },
+    );
   },
 
   /**
@@ -311,6 +334,15 @@ export const admin = {
   /** Open-ended sanctions, oldest first, so they cannot accumulate unseen. */
   indefiniteSuspensions(cursor: string | null, extra?: Signal): Promise<Page<AdminAppeal['sanction'] & { user: AdminUserRef; createdAt: string }>> {
     return transport.request('GET', '/admin/suspensions/indefinite', options({ cursor: cursor ?? undefined }, extra));
+  },
+
+  /** `GET /categories` plus whether each one still holds any links. */
+  categories(extra?: Signal): Promise<Page<AdminCategory>> {
+    return transport.request<Page<AdminCategory>>(
+      'GET',
+      '/admin/categories',
+      options(undefined, extra),
+    );
   },
 
   retierLink(publicId: string, tier: number | null): Promise<void> {

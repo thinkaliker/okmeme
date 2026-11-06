@@ -23,6 +23,17 @@ function CategoryDot({ slug }: { slug: string }) {
   return <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={tintDot(slug)} />;
 }
 
+const CATEGORIES_CHANGED = 'okmeme:categories-changed';
+
+/**
+ * The nav fetches once on mount, which would leave it stale after the admin
+ * panel adds, renames or deletes a category in the same tab. This tells it to
+ * fetch again.
+ */
+export function notifyCategoriesChanged(): void {
+  window.dispatchEvent(new Event(CATEGORIES_CHANGED));
+}
+
 /**
  * Categories are the top-level axis: admin-created, exactly one per link. Tags
  * filter within or across them and are not listed here — a wall of every tag on
@@ -32,12 +43,22 @@ export function CategoryNav({ onNavigate }: { onNavigate?: () => void }) {
   const [categories, setCategories] = useState<readonly Category[]>([]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    taxonomy
-      .categories({ signal: controller.signal })
-      .then(setCategories)
-      .catch(() => undefined);
-    return () => controller.abort();
+    let controller = new AbortController();
+    const load = () => {
+      controller.abort();
+      controller = new AbortController();
+      taxonomy
+        .categories({ signal: controller.signal })
+        .then(setCategories)
+        .catch(() => undefined);
+    };
+
+    load();
+    window.addEventListener(CATEGORIES_CHANGED, load);
+    return () => {
+      window.removeEventListener(CATEGORIES_CHANGED, load);
+      controller.abort();
+    };
   }, []);
 
   return (

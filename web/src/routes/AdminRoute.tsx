@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { admin, taxonomy } from '@/api/endpoints';
 import { AuthorLabel } from '@/components/AuthorLabel';
+import { notifyCategoriesChanged } from '@/components/CategoryNav';
 import { RecoveryCodes } from '@/components/RecoveryCodes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FieldHint, Input, Label, Select, Textarea } from '@/components/ui/field';
 import type {
   AdminAppeal,
+  AdminCategory,
   AdminInvite,
   AdminRecoveryRequest,
   AdminReport,
@@ -19,10 +21,19 @@ import type {
 } from '@/domain/admin';
 import type { TagProposal } from '@/domain/link';
 import type { ReasonCategory, SuspensionType } from '@/domain/user';
-import { TIER, can } from '@/domain/tier';
+import {
+  TIER,
+  assignableTiers,
+  can,
+  type AuthorTierLabel,
+  type TierOrdinal,
+  type ViewerTier,
+} from '@/domain/tier';
 import { useCursorList } from '@/hooks/useCursorList';
 import type { MessageKey } from '@/i18n/en';
-import { t } from '@/i18n/t';
+import { t, tierLabel } from '@/i18n/t';
+import { toCategorySlug } from '@/lib/slug';
+import { tintDot } from '@/lib/tint';
 import { absoluteTime, relativeTime } from '@/lib/utils';
 import { useSession } from '@/session/SessionProvider';
 
@@ -45,6 +56,7 @@ type TabKey =
   | 'appeals'
   | 'recovery'
   | 'users'
+  | 'categories'
   | 'invites'
   | 'audit'
   | 'settings';
@@ -56,6 +68,7 @@ const TABS: readonly (readonly [TabKey, MessageKey, boolean])[] = [
   ['appeals', 'admin.tab.appeals', true],
   ['recovery', 'admin.tab.recovery', true],
   ['users', 'admin.tab.users', true],
+  ['categories', 'admin.tab.categories', true],
   ['invites', 'admin.tab.invites', true],
   ['audit', 'admin.tab.audit', true],
   ['settings', 'admin.tab.settings', true],
@@ -540,7 +553,131 @@ function SuspendForm({ user, onDone }: { user: AdminUser; onDone: () => void }) 
   );
 }
 
-function Users() {
+/**
+ * Ordinal, label and what the tier can do — one fixed table for the legend, the
+ * badge and the picker.
+ *
+ * Elsewhere a tier name is chosen by the server and never derived from an
+ * ordinal in the browser, because there it is a visibility boundary. Not here:
+ * this screen is admin-only and an admin already sees every tier, so naming the
+ * ordinal crosses nothing.
+ */
+const TIER_ROWS: readonly (readonly [TierOrdinal, AuthorTierLabel, MessageKey])[] = [
+  [TIER.limited, 'limited', 'admin.tierLegend.limited'],
+  [TIER.full, 'full', 'admin.tierLegend.full'],
+  [TIER.staff, 'staff', 'admin.tierLegend.staff'],
+  [TIER.admin, 'admin', 'admin.tierLegend.admin'],
+  [TIER.owner, 'owner', 'admin.tierLegend.owner'],
+];
+
+function tierText(ordinal: number): string {
+  const row = TIER_ROWS.find(([value]) => value === ordinal);
+  return row === undefined ? `${ordinal}` : `${ordinal} · ${tierLabel(row[1])}`;
+}
+
+function TierLegend({ viewer }: { viewer: ViewerTier }) {
+  return (
+    <details open className="rounded-lg border border-border p-3 text-sm">
+      <summary className="cursor-pointer font-medium">{t('admin.tierLegendTitle')}</summary>
+      <p className="mt-2 text-muted-foreground">{t('admin.tierLegendBody')}</p>
+      <dl className="mt-3 grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-1.5">
+        {TIER_ROWS.map(([ordinal, , description]) => (
+          <Fragment key={ordinal}>
+            <dt>
+              <Badge variant="tier">{tierText(ordinal)}</Badge>
+            </dt>
+            <dd className="text-muted-foreground">{t(description)}</dd>
+          </Fragment>
+        ))}
+      </dl>
+      <p className="mt-3 text-muted-foreground">
+        {viewer >= TIER.owner ? t('admin.tierRuleOwner') : t('admin.tierRuleAdmin')}
+      </p>
+    </details>
+  );
+}
+
+/**
+ * Pick, then apply. A select that fires on change turns an arrow key on a
+ * focused control into a promotion, and promotion is a full retroactive reveal
+ * that demotion cannot take back.
+ *
+ * Offers only what the server would accept. Owner is never on the list: the
+ * owner set is changed under /owner, which is where "the last owner cannot be
+ * removed" is enforced.
+ */
+function TierControl({
+  user,
+  viewer,
+  self,
+  onApply,
+}: {
+  user: AdminUser;
+  viewer: ViewerTier;
+  self: boolean;
+  onApply: (tier: number) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState<number>(user.tier);
+  const [busy, setBusy] = useState(false);
+
+  // The list reloads after a change; follow it rather than a stale pick.
+  useEffect(() => setDraft(user.tier), [user.tier]);
+
+  if (user.state !== 'active') return null;
+
+  const choices = self ? [] : assignableTiers(viewer, user.tier);
+
+  if (choices.length === 0) {
+    if (user.tier >= TIER.owner) {
+      return can.ownerSettings(viewer) ? (
+        <RouterLink to="/owner" className="text-xs underline underline-offset-4">
+          {t('admin.tierLockedOwner')}
+        </RouterLink>
+      ) : (
+        <p className="text-xs text-muted-foreground">{t('admin.tierLockedOwner')}</p>
+      );
+    }
+    return (
+      <p className="text-xs text-muted-foreground">
+        {self ? t('admin.tierLockedSelf') : t('admin.tierLockedAdmin')}
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex items-end gap-2">
+      <div className="flex flex-col gap-1">
+        <Label htmlFor={`tier-${user.publicId}`} className="text-xs">
+          {t('admin.setTier')}
+        </Label>
+        <Select
+          id={`tier-${user.publicId}`}
+          value={String(draft)}
+          onChange={(event) => setDraft(Number(event.target.value))}
+        >
+          {choices.map((tier) => (
+            <option key={tier} value={tier}>
+              {tierText(tier)}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy || draft === user.tier}
+        onClick={() => {
+          setBusy(true);
+          void onApply(draft).finally(() => setBusy(false));
+        }}
+      >
+        {t('admin.tierApply')}
+      </Button>
+    </div>
+  );
+}
+
+function Users({ viewer, selfId }: { viewer: ViewerTier; selfId: string | null }) {
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
   const state = useCursorList<AdminUser>(
@@ -563,6 +700,8 @@ function Users() {
 
   return (
     <section className="flex flex-col gap-3">
+      <TierLegend viewer={viewer} />
+
       <form
         className="flex gap-2"
         onSubmit={(event) => {
@@ -593,7 +732,9 @@ function Users() {
           <>
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-medium">{user.username ?? <em>deleted</em>}</span>
-              <Badge variant="tier">{user.tier}</Badge>
+              <Badge variant="tier" title={t('admin.tierLegendTitle')}>
+                {tierText(user.tier)}
+              </Badge>
               {user.sanction === null ? null : (
                 <Badge variant="outline">{user.sanction.types.join(', ')}</Badge>
               )}
@@ -608,37 +749,27 @@ function Users() {
             </div>
 
             <div className="flex flex-wrap items-end gap-2">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor={`tier-${user.publicId}`} className="text-xs">
-                  {t('admin.setTier')}
-                </Label>
-                {/* Owner is absent on purpose: the owner set is managed under
-                    /owner, and the server refuses tier 5 from this route. */}
-                <Select
-                  id={`tier-${user.publicId}`}
-                  defaultValue={String(user.tier)}
-                  onChange={(event) =>
-                    void act(() => admin.setTier(user.publicId, Number(event.target.value)))
-                  }
-                >
-                  {[TIER.limited, TIER.full, TIER.staff, TIER.admin].map((tier) => (
-                    <option key={tier} value={tier}>
-                      {tier}
-                    </option>
-                  ))}
-                </Select>
-              </div>
+              <TierControl
+                user={user}
+                viewer={viewer}
+                self={user.publicId === selfId}
+                onApply={(tier) => act(() => admin.setTier(user.publicId, tier))}
+              />
 
               {user.sanction === null ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    setSuspending((current) => (current === user.publicId ? null : user.publicId))
-                  }
-                >
-                  {t('admin.suspend')}
-                </Button>
+                // The server refuses a suspension of anyone at or above the
+                // actor's own tier, which includes the actor themselves.
+                user.tier < viewer ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setSuspending((current) => (current === user.publicId ? null : user.publicId))
+                    }
+                  >
+                    {t('admin.suspend')}
+                  </Button>
+                ) : null
               ) : (
                 <Button
                   size="sm"
@@ -675,6 +806,271 @@ function Users() {
           </>
         )}
       />
+    </section>
+  );
+}
+
+/* ---------------------------------------------------------------- categories */
+
+/**
+ * Add, rename, delete.
+ *
+ * The slug is fixed at creation: it is the `/c/:slug` address and the seed of
+ * the category's colour, so a rename changes the name and nothing else. A link
+ * has exactly one category, so deleting one that still holds links means
+ * choosing where they go — the server refuses otherwise.
+ */
+function Categories() {
+  const [items, setItems] = useState<readonly AdminCategory[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState('');
+  const [renaming, setRenaming] = useState<{ slug: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState<{ slug: string; moveTo: string } | null>(null);
+
+  const load = useCallback(() => {
+    admin
+      .categories()
+      .then((page) => setItems(page.items))
+      .catch(() => {
+        setItems([]);
+        setError(t('app.error'));
+      });
+  }, []);
+
+  useEffect(load, [load]);
+
+  async function run(work: () => Promise<unknown>, done: () => void) {
+    setBusy(true);
+    setError(null);
+    try {
+      await work();
+      done();
+      notifyCategoriesChanged();
+      load();
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : t('app.error'));
+      // Someone posted into it since this list loaded. Reloading flips its
+      // in-use flag, which is what brings up the move-to picker.
+      if (cause instanceof ApiError && cause.code === 'category_in_use') load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const newSlug = toCategorySlug(name);
+
+  if (items === null) return <p className="text-sm text-muted-foreground">{t('app.loading')}</p>;
+
+  return (
+    <section className="flex flex-col gap-3">
+      <p className="text-sm text-muted-foreground">{t('admin.categoriesHint')}</p>
+
+      <form
+        className="flex flex-wrap items-end gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (newSlug === '') return;
+          void run(() => taxonomy.createCategory(name.trim()), () => setName(''));
+        }}
+      >
+        <div className="flex min-w-48 flex-1 flex-col gap-1">
+          <Label htmlFor="category-new" className="text-xs">
+            {t('admin.categoryName')}
+          </Label>
+          <Input
+            id="category-new"
+            value={name}
+            maxLength={48}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </div>
+        <Button size="sm" type="submit" disabled={busy || newSlug === ''}>
+          {t('admin.newCategory')}
+        </Button>
+        {name.trim() === '' ? null : (
+          <FieldHint className={newSlug === '' ? 'w-full text-destructive' : 'w-full'}>
+            {newSlug === ''
+              ? t('admin.categoryNoSlug')
+              : t('admin.categoryAddress', { slug: newSlug })}
+          </FieldHint>
+        )}
+      </form>
+
+      {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
+
+      {items.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          {t('admin.noCategories')}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {items.map((category) => {
+            const others = items.filter((other) => other.slug !== category.slug);
+            const isRenaming = renaming?.slug === category.slug;
+            const isDeleting = deleting?.slug === category.slug;
+
+            return (
+              <Row key={category.slug}>
+                {isRenaming ? (
+                  <form
+                    className="flex flex-wrap items-end gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (renaming.name.trim() === '') return;
+                      void run(
+                        () => taxonomy.renameCategory(category.slug, renaming.name.trim()),
+                        () => setRenaming(null),
+                      );
+                    }}
+                  >
+                    <div className="flex min-w-48 flex-1 flex-col gap-1">
+                      <Label htmlFor={`category-name-${category.slug}`} className="text-xs">
+                        {t('admin.categoryName')}
+                      </Label>
+                      <Input
+                        id={`category-name-${category.slug}`}
+                        autoFocus
+                        value={renaming.name}
+                        maxLength={48}
+                        onChange={(event) =>
+                          setRenaming({ slug: category.slug, name: event.target.value })
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === 'Escape') setRenaming(null);
+                        }}
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      type="submit"
+                      disabled={
+                        busy ||
+                        renaming.name.trim() === '' ||
+                        renaming.name.trim() === category.name
+                      }
+                    >
+                      {t('admin.save')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                      onClick={() => setRenaming(null)}
+                    >
+                      {t('admin.cancel')}
+                    </Button>
+                  </form>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span
+                      aria-hidden="true"
+                      className="size-2 shrink-0 rounded-full"
+                      style={tintDot(category.slug)}
+                    />
+                    <span className="font-medium">{category.name}</span>
+                    <code className="font-mono text-xs text-muted-foreground">
+                      /c/{category.slug}
+                    </code>
+                    <Badge variant="outline">
+                      {category.inUse ? t('admin.categoryInUse') : t('admin.categoryEmpty')}
+                    </Badge>
+                    <div className="ml-auto flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => {
+                          setDeleting(null);
+                          setRenaming({ slug: category.slug, name: category.name });
+                        }}
+                      >
+                        {t('admin.rename')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => {
+                          setRenaming(null);
+                          setDeleting(
+                            isDeleting
+                              ? null
+                              : { slug: category.slug, moveTo: others[0]?.slug ?? '' },
+                          );
+                        }}
+                      >
+                        {t('admin.delete')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {isDeleting ? (
+                  <div className="flex flex-col gap-2 rounded-md border border-destructive/40 p-3">
+                    {!category.inUse ? (
+                      <p className="text-sm">
+                        {t('admin.categoryDeleteEmpty', { name: category.name })}
+                      </p>
+                    ) : others.length === 0 ? (
+                      <p className="text-sm">{t('admin.categoryOnlyOne')}</p>
+                    ) : (
+                      <>
+                        <p className="text-sm">
+                          {t('admin.categoryDeleteMove', { name: category.name })}
+                        </p>
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`category-move-${category.slug}`} className="text-xs">
+                            {t('admin.categoryMoveTo')}
+                          </Label>
+                          <Select
+                            id={`category-move-${category.slug}`}
+                            value={deleting.moveTo}
+                            onChange={(event) =>
+                              setDeleting({ slug: category.slug, moveTo: event.target.value })
+                            }
+                          >
+                            {others.map((other) => (
+                              <option key={other.slug} value={other.slug}>
+                                {other.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="flex gap-2">
+                      {category.inUse && others.length === 0 ? null : (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(
+                              () =>
+                                taxonomy.deleteCategory(
+                                  category.slug,
+                                  category.inUse ? deleting.moveTo : undefined,
+                                ),
+                              () => setDeleting(null),
+                            )
+                          }
+                        >
+                          {t('admin.categoryDeleteConfirm')}
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => setDeleting(null)}>
+                        {t('admin.cancel')}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </Row>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }
@@ -896,7 +1292,7 @@ function Settings({ viewerTier }: { viewerTier: number }) {
 /* ---------------------------------------------------------------- route */
 
 export default function AdminRoute() {
-  const { tier } = useSession();
+  const { tier, me } = useSession();
   const [params, setParams] = useSearchParams();
 
   const adminTier = can.reviewReports(tier) || tier >= TIER.owner;
@@ -945,7 +1341,8 @@ export default function AdminRoute() {
       {current === 'reports' ? <Reports /> : null}
       {current === 'appeals' ? <Appeals /> : null}
       {current === 'recovery' ? <RecoveryQueue /> : null}
-      {current === 'users' ? <Users /> : null}
+      {current === 'users' ? <Users viewer={tier} selfId={me?.publicId ?? null} /> : null}
+      {current === 'categories' ? <Categories /> : null}
       {current === 'invites' ? <Invites /> : null}
       {current === 'audit' ? <Audit /> : null}
       {current === 'settings' ? <Settings viewerTier={tier} /> : null}

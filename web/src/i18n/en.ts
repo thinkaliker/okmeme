@@ -256,6 +256,7 @@ export const en = {
   'admin.tab.appeals': 'Appeals',
   'admin.tab.recovery': 'Recovery',
   'admin.tab.users': 'Users',
+  'admin.tab.categories': 'Categories',
   'admin.tab.invites': 'Invites',
   'admin.tab.audit': 'Audit',
   'admin.tab.settings': 'Settings',
@@ -303,6 +304,43 @@ export const en = {
   'admin.ownerOnly': 'owner only',
   'admin.save': 'Save',
   'admin.invalidJson': 'That is not valid JSON.',
+  'admin.cancel': 'Cancel',
+
+  'admin.tierLegendTitle': 'Tiers — a higher number means more access',
+  'admin.tierLegendBody':
+    'The number beside each username is that person’s tier. Each tier sees everything at its own level and below, plus posts from the one tier directly above, shown without names.',
+  'admin.tierLegend.limited': 'posts, votes and bookmarks; no NSFW',
+  'admin.tierLegend.full': 'may post NSFW; edits their own titles',
+  'admin.tierLegend.staff': 'edits limited and full posts; creates and approves tags',
+  'admin.tierLegend.admin': 'edits staff and below; promotes up to admin; categories, invites, reports',
+  'admin.tierLegend.owner': 'recovery and instance settings only; cannot post or vote',
+  'admin.tierRuleAdmin':
+    'You can move anyone below admin to any tier up to admin. Admins can’t change other admins, and owners are managed on the Owner page.',
+  'admin.tierRuleOwner':
+    'You can move anyone who isn’t an owner, admins included. Adding or removing owners happens on the Owner page.',
+  'admin.tierApply': 'Apply',
+  'admin.tierLockedOwner': 'Owner — managed on the Owner page.',
+  'admin.tierLockedSelf': 'This is you. Another admin or an owner can change your tier.',
+  'admin.tierLockedAdmin': 'Admins can’t change another admin’s tier.',
+
+  'admin.categoriesHint':
+    'Every link has exactly one category, so links can’t be submitted until at least one exists. Renaming changes only the name people see — the address and colour stay the same.',
+  'admin.categoryName': 'Name',
+  'admin.newCategory': 'Add category',
+  'admin.categoryAddress': 'Address: /c/{slug}',
+  'admin.categoryNoSlug': 'That name has no letters or numbers to make an address from.',
+  'admin.categoryInUse': 'has links',
+  'admin.categoryEmpty': 'empty',
+  'admin.rename': 'Rename',
+  'admin.delete': 'Delete',
+  'admin.categoryDeleteEmpty': 'Delete “{name}”? It has no links.',
+  'admin.categoryDeleteMove':
+    '“{name}” still has links, removed ones included. They move to the category you pick, and the old address stops working.',
+  'admin.categoryMoveTo': 'Move its links to',
+  'admin.categoryOnlyOne':
+    'This is the only category and it still has links. Add another one first so they have somewhere to go.',
+  'admin.categoryDeleteConfirm': 'Delete category',
+  'admin.noCategories': 'No categories yet.',
 
   'owner.title': 'Owner',
   'owner.owners': 'Owners',

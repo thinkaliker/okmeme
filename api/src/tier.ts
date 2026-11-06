@@ -83,9 +83,17 @@ export const canModerateTier = (actor: number, subject: number): boolean => {
   return false;
 };
 
-/** An admin may promote up to admin; staff may promote up to full. Never above self. */
+/**
+ * An admin may promote up to admin; staff may promote up to full. Never above self.
+ *
+ * Nobody moves a user into or out of the owner set this way, owners included:
+ * that set is managed under /owner, which is the only place that enforces "the
+ * last owner cannot be removed". Letting an owner be re-tiered here would be a
+ * second door that skips the invariant.
+ */
 export const canSetTier = (actor: number, current: number, next: number): boolean => {
-  if (actor >= TIER.owner) return true; // owners manage the owner set itself
+  if (current >= TIER.owner || next >= TIER.owner) return false;
+  if (actor >= TIER.owner) return true; // owners may re-tier anyone outside the owner set
   if (actor >= TIER.admin) return current < TIER.admin && next <= TIER.admin;
   if (actor >= TIER.staff) return current < TIER.staff && next <= TIER.full;
   return false;

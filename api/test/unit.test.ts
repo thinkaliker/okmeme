@@ -63,6 +63,18 @@ describe('capabilities', () => {
     expect(canSetTier(TIER.staff, TIER.limited, TIER.full)).toBe(true);
     expect(canSetTier(TIER.staff, TIER.limited, TIER.staff)).toBe(false);
   });
+
+  it('never moves anyone into or out of the owner set, not even for an owner', () => {
+    // That set has its own route, which is the one that refuses to remove the
+    // last owner. A re-tier that could reach it would skip that check.
+    expect(canSetTier(TIER.owner, TIER.owner, TIER.limited)).toBe(false);
+    expect(canSetTier(TIER.owner, TIER.owner, TIER.admin)).toBe(false);
+    expect(canSetTier(TIER.owner, TIER.admin, TIER.owner)).toBe(false);
+    expect(canSetTier(TIER.admin, TIER.owner, TIER.limited)).toBe(false);
+    // Outside the set, an owner may still re-tier anyone, admins included.
+    expect(canSetTier(TIER.owner, TIER.admin, TIER.full)).toBe(true);
+    expect(canSetTier(TIER.owner, TIER.limited, TIER.admin)).toBe(true);
+  });
 });
 
 describe('cursors', () => {

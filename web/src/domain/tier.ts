@@ -110,3 +110,21 @@ export const can = {
   readAuditLog: (viewer: ViewerTier) => viewer >= TIER.admin,
   ownerSettings: (viewer: ViewerTier) => viewer >= TIER.owner,
 } as const;
+
+/**
+ * The tiers an admin-panel actor may move a user at `current` to — the mirror
+ * of `canSetTier` in api/src/tier.ts, as a list so the panel can offer exactly
+ * those and nothing the server would refuse. Empty means the row is read-only.
+ *
+ * Admins may move anyone below admin to any tier up to admin; owners may move
+ * anyone who is not an owner. Nobody moves a user into or out of the owner set
+ * here: that set is managed under /owner, the one place that refuses to remove
+ * the last owner. Presentation only — the server checks all of this again.
+ */
+export function assignableTiers(actor: ViewerTier, current: number): readonly TierOrdinal[] {
+  if (current >= TIER.owner) return [];
+  const assignable = [TIER.limited, TIER.full, TIER.staff, TIER.admin] as const;
+  if (actor >= TIER.owner) return assignable;
+  if (actor >= TIER.admin) return current < TIER.admin ? assignable : [];
+  return [];
+}

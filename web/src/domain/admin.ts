@@ -1,3 +1,4 @@
+import type { Category } from '@/domain/link';
 import type { ReasonCategory, SuspensionType } from '@/domain/user';
 
 /**
@@ -131,4 +132,15 @@ export interface SuspendInput {
   readonly expiresAt: string | null;
   readonly reasonCategory: ReasonCategory;
   readonly note: string;
+}
+
+/**
+ * A category as the editor sees it. `inUse` says whether any link — removed
+ * ones included — still references it, which is what decides whether deleting
+ * it needs somewhere to move them. A yes/no rather than a count: no endpoint
+ * emits a total, the admin ones included.
+ */
+export interface AdminCategory extends Category {
+  readonly inUse: boolean;
+  readonly createdAt: string;
 }

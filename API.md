@@ -74,6 +74,8 @@ POST   /links/preview          → canonicalize + visible-scope dedup check, pre
 ```http
 GET    /categories
 POST   /categories             admin
+PATCH  /categories/:slug       admin; renames — the slug never changes
+DELETE /categories/:slug?move_to=   admin; 409 category_in_use if it holds links and move_to is absent
 GET    /tags                   approved, plus the caller's own pending proposals
 POST   /tags                   staff+
 GET    /tags/pending           staff+; 404 below that
@@ -141,7 +143,7 @@ POST   /admin/appeals/:id/resolve             outcome + optional constrained not
 GET    /admin/recovery-requests?cursor=       oldest first; never auto-closed
 POST   /admin/recovery-requests/:id/resolve
 GET    /admin/users?cursor=&q=                 q matches usernames; admins see every tier
-POST   /admin/users/:public_id/tier          promote / demote
+POST   /admin/users/:public_id/tier          promote / demote; never into, out of, or within the owner set
 POST   /admin/users/:public_id/suspend       types[], expires_at nullable, reason
 POST   /admin/users/:public_id/unsuspend
 POST   /admin/users/:public_id/reset         issue fresh recovery codes
@@ -150,6 +152,7 @@ POST   /admin/links/:public_id/tier          moderator re-tier → pinned_tier
 GET    /admin/invites
 POST   /admin/invites
 DELETE /admin/invites/:id                    revoke before consumption
+GET    /admin/categories                     the editor's list: each category plus in_use, a boolean
 GET    /admin/audit?cursor=                  admin + owner
 GET    /admin/settings
 PATCH  /admin/settings

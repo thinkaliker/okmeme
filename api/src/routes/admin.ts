@@ -7,6 +7,7 @@ import { conflict, forbidden, invalid, notFound } from '../errors.js';
 import { decodeCursor, parseLimit, toPage } from '../lib/cursor.js';
 import { hashToken, inviteCode, publicId } from '../lib/ids.js';
 import { BUCKETS, limit } from '../ratelimit.js';
+import { categoryPayload } from '../serialize.js';
 import { audit } from '../services/audit.js';
 import { issueRecoveryCodes, revokeAllCredentials } from '../services/accounts.js';
 import { notify } from '../services/notify.js';
@@ -375,9 +376,16 @@ export function adminRoutes(): Hono<AppEnv> {
     if (target === null || target.state !== 'active') throw notFound('no such user');
 
     // Admins cannot demote other admins, and nobody promotes above themselves.
-    // The owner set is managed under /owner, not here.
-    if (body.data.tier >= TIER.owner) throw forbidden('the owner set is managed under /owner');
+    // The owner set is managed under /owner, not here — in either direction, so
+    // an owner cannot be demoted around the last-owner check that route makes.
+    if (body.data.tier >= TIER.owner || target.tier >= TIER.owner) {
+      throw forbidden('the owner set is managed under /owner');
+    }
+    if (target.id === actor.id) throw forbidden('you cannot change your own tier');
     if (!canSetTier(actor.tier, target.tier, body.data.tier)) throw forbidden('not permitted');
+
+    // A no-op would still send a "demoted" notification, which is a lie.
+    if (body.data.tier === target.tier) return c.body(null, 204);
 
     await db.user.update({ where: { id: target.id }, data: { tier: body.data.tier } });
 
@@ -655,6 +663,33 @@ export function adminRoutes(): Hono<AppEnv> {
     });
 
     return c.body(null, 204);
+  });
+
+  /* -------------------------------------------------------------- categories */
+
+  /**
+   * The editor's view of `GET /categories`: the same rows plus whether each one
+   * still holds any links, removed ones included, so the panel knows when a
+   * delete needs somewhere to move them.
+   *
+   * A boolean, not a number. Admins can see every row, so a count would leak
+   * nothing here — but "never emit a total" is a rule for every endpoint, and
+   * the editor needs no more than yes or no.
+   */
+  app.get('/admin/categories', async (c) => {
+    const rows = await db.category.findMany({
+      orderBy: { name: 'asc' },
+      include: { links: { select: { id: true }, take: 1 } },
+    });
+
+    return c.json({
+      items: rows.map((row) => ({
+        ...categoryPayload(row.slug, row.name),
+        inUse: row.links.length > 0,
+        createdAt: row.createdAt.toISOString(),
+      })),
+      nextCursor: null,
+    });
   });
 
   /* -------------------------------------------------------------- audit */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidTagSlug, toTagSlug } from '@/lib/slug';
+import { isValidTagSlug, toCategorySlug, toTagSlug } from '@/lib/slug';
 
 describe('toTagSlug', () => {
   it('collapses the spellings that would otherwise become separate tags', () => {
@@ -19,5 +19,14 @@ describe('toTagSlug', () => {
     expect(isValidTagSlug(toTagSlug('!!!'))).toBe(false);
     expect(isValidTagSlug(toTagSlug('a'))).toBe(false);
     expect(isValidTagSlug(toTagSlug('go'))).toBe(true);
+  });
+});
+
+describe('toCategorySlug', () => {
+  it('matches the server: lowercase, dashes, accents dropped, 32 at most', () => {
+    expect(toCategorySlug('Self Hosting')).toBe('self-hosting');
+    expect(toCategorySlug('Café & Bars')).toBe('cafe-bars');
+    expect(toCategorySlug('!!!')).toBe('');
+    expect(toCategorySlug('x'.repeat(40))).toHaveLength(32);
   });
 });
