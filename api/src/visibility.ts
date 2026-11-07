@@ -32,8 +32,13 @@ export interface LinkRow {
   removed_at: Date | null;
   removed_reason: string | null;
   effective_tier: number;
-  /** The author's current tier. Attribution and moderation use `standingTier`. */
-  author_tier: number;
+  /**
+   * The tier the author is named at on this post, fixed when it was posted.
+   * Attribution and moderation read it through `standingTier`.
+   */
+  attribution_tier: number;
+  /** Null when the post follows its author. Only ever sent to the author. */
+  pinned_tier: number | null;
   author_id: bigint;
   author_public_id: string;
   author_username: string | null;
@@ -64,6 +69,11 @@ export interface LinkQuery {
 /**
  * `effective_tier = COALESCE(links.pinned_tier, author.tier)`.
  *
+ * Since 0005 every post has a pin — set at posting to the author's tier, or one
+ * they chose below it — so the author's later promotions and demotions no
+ * longer move their back catalogue. The fallback to the author's tier remains
+ * for a post an admin explicitly unpins.
+ *
  * Visibility follows the author's **current** tier, not the tier they held when
  * posting: promotion and demotion move a whole back catalogue. `pinned_tier` is
  * the moderator's override and the tombstone a deleted account leaves behind so
@@ -74,18 +84,22 @@ export const EFFECTIVE_TIER = Prisma.sql`COALESCE(l.pinned_tier, u.tier)`;
 
 /**
  * The tier an author stands at on one post: the higher of where the post lives
- * and where its author actually is.
+ * and the tier the author was at when they posted it (`attribution_tier`).
  *
  * `effective_tier` decides who may *see* a post. It cannot decide who may see
  * its author's *name*: a post pinned below its author — by a moderator, or by
  * the author posting to a lower tier — would otherwise hand that author's real
  * username to every tier it was pinned down to, which is the persistent
- * cross-tier identity the ring exists to prevent. Attribution and moderation
- * read this instead, so a post pinned down still shows its author only to the
- * tiers that could already see them.
+ * cross-tier identity the ring exists to prevent.
+ *
+ * It is fixed at posting time rather than read from the author's current tier
+ * so that a promotion changes nothing anyone can see: a full user promoted to
+ * staff keeps their name on their old full-tier posts, for the readers who
+ * already knew it. Relabelling those posts `[staff]` would tell those readers
+ * exactly who had been promoted.
  */
-export const standingTier = (row: Pick<LinkRow, 'effective_tier' | 'author_tier'>): number =>
-  Math.max(row.effective_tier, row.author_tier);
+export const standingTier = (row: Pick<LinkRow, 'effective_tier' | 'attribution_tier'>): number =>
+  Math.max(row.effective_tier, row.attribution_tier);
 
 /** Epoch microseconds — Postgres' own timestamp resolution, so no row is skipped. */
 const RANK_NEW = Prisma.sql`(EXTRACT(EPOCH FROM l.created_at) * 1000000)::bigint`;
@@ -199,7 +213,8 @@ export async function queryLinks(query: LinkQuery): Promise<LinkRow[]> {
       l.removed_at,
       l.removed_reason,
       ${EFFECTIVE_TIER}::int AS effective_tier,
-      u.tier::int   AS author_tier,
+      COALESCE(l.attribution_tier, u.tier)::int AS attribution_tier,
+      l.pinned_tier::int AS pinned_tier,
       l.author_id,
       u.public_id   AS author_public_id,
       u.username::text AS author_username,
@@ -236,7 +251,9 @@ export async function findVisibleLink(
       l.id, l.public_id, l.kind::text AS kind, l.url, l.media_type::text AS media_type,
       l.title, l.body, l.host, l.thumb_key, l.favicon_key, l.is_nsfw,
       l.created_at, l.edited_at, l.removed_at, l.removed_reason,
-      ${EFFECTIVE_TIER}::int AS effective_tier, u.tier::int AS author_tier,
+      ${EFFECTIVE_TIER}::int AS effective_tier,
+      COALESCE(l.attribution_tier, u.tier)::int AS attribution_tier,
+      l.pinned_tier::int AS pinned_tier,
       l.author_id, u.public_id AS author_public_id, u.username::text AS author_username,
       c.slug AS category_slug, c.name AS category_name,
       COALESCE(ls.score, 0)::int AS score,

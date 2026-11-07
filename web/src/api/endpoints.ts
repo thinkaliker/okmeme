@@ -100,6 +100,14 @@ export const links = {
     return transport.request<Link>(on ? 'POST' : 'DELETE', `/links/${publicId}/bookmark`);
   },
 
+  /**
+   * The author choosing who can see their own post: their own tier (null) or,
+   * with permission, one below it. Raising it back never needs permission.
+   */
+  setTier(publicId: string, tier: number | null): Promise<Link> {
+    return transport.request<Link>('POST', `/links/${publicId}/tier`, { body: { tier } });
+  },
+
   /** The author, or a moderator strictly above the post's tier. */
   edit(publicId: string, patch: LinkPatch): Promise<Link> {
     return transport.request<Link>('PATCH', `/links/${publicId}`, { body: patch });

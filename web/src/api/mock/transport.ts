@@ -14,7 +14,9 @@ import type { Category, Link, LinkPatch, PreviewResult, SubmitDraft, Tag, TagPro
 import {
   CAPABILITIES,
   NOTHING,
+  canAdjustOwnTier,
   canEditCell,
+  canSetOwnTier,
   defaultGrant,
   effectivePermissions,
   isCapability,
@@ -70,14 +72,23 @@ const isoFromMinutes = (minutes: number): string =>
   new Date(START - minutes * 60_000).toISOString();
 
 interface Row extends MockLink {
+  /** The tier the author is named at on this post, fixed at posting. */
+  attributionTier: number;
   createdAt: string;
   editedAt: string | null;
   removedAt: string | null;
 }
 
+/**
+ * Fixtures are frozen the way migration 0005 freezes real rows: pinned where
+ * they currently live, and attributed at their author's tier.
+ */
 function toRow(link: MockLink): Row {
+  const authorTier = MOCK_USERS.find((user) => user.id === link.authorId)?.tier ?? TIER.limited;
   return {
     ...link,
+    pinnedTier: link.pinnedTier ?? authorTier,
+    attributionTier: authorTier,
     createdAt: isoFromMinutes(link.minutesAgo),
     editedAt: link.editedMinutesAgo === undefined ? null : isoFromMinutes(link.editedMinutesAgo),
     removedAt: link.removedReasonKey === undefined ? null : isoFromMinutes(link.minutesAgo - 10),
@@ -240,7 +251,7 @@ function effectiveTierOf(row: Row): EffectiveTier {
 
 /** `standingTier` on the server: never lower than where the author really is. */
 function standingOf(row: Row): EffectiveTier {
-  return effectiveTier(Math.max(effectiveTierOf(row), authorOf(row).tier));
+  return effectiveTier(Math.max(effectiveTierOf(row), row.attributionTier));
 }
 
 const TIER_LABEL_BY_ORDINAL: Readonly<Record<number, AuthorTierLabel>> = {
@@ -344,8 +355,9 @@ function viewerCanFor(row: Row): ViewerCan {
   return {
     edit: live && !muted && ((mine && permissions.has('editOwn')) || moderate),
     remove: live && !muted && (mine || moderate),
-    retier: permissions.has('retier'),
+    retier: !mine && permissions.has('retier'),
     moderate: live && !muted && moderate,
+    setTier: live && !muted && mine && canAdjustOwnTier({ tier: user.tier, permissions }, effectiveTierOf(row)),
   };
 }
 
@@ -370,6 +382,8 @@ function toPayload(viewer: ViewerTier, row: Row): Link {
     editedAt: row.editedAt,
     removed,
     viewerCan: viewerCanFor(row),
+    // Only the author is told what they chose; absent for everyone else.
+    ...(currentUser()?.id === row.authorId ? { pinnedTier: row.pinnedTier ?? null } : {}),
   };
 
   // A removed post keeps its notice and loses its body. The notice never names
@@ -619,12 +633,12 @@ function submit(draft: SubmitDraft): Link {
   if (draft.isNsfw && !allows('postNsfw')) {
     throw new ApiError(403, 'forbidden', 'this tier cannot mark posts nsfw');
   }
-  const pinned = draft.pinnedTier ?? null;
-  const pinnedTier = pinned === null || pinned === user.tier ? null : pinned;
-  if (pinnedTier !== null && pinnedTier > user.tier) {
+  // Pinned where it is posted, like the server.
+  const pinnedTier = draft.pinnedTier ?? user.tier;
+  if (pinnedTier > user.tier) {
     throw new ApiError(403, 'forbidden', 'a post cannot live above its author');
   }
-  if (pinnedTier !== null && !allows('postBelow')) {
+  if (pinnedTier < user.tier && !allows('postBelow')) {
     throw new ApiError(403, 'forbidden', 'this tier cannot post to a lower tier');
   }
 
@@ -639,7 +653,8 @@ function submit(draft: SubmitDraft): Link {
     ...(draft.kind === 'media' ? { mediaType: 'image' as const } : {}),
     ...(draft.body ? { body: draft.body } : {}),
     authorId: user.id,
-    ...(pinnedTier === null ? {} : { pinnedTier: pinnedTier as TierOrdinal }),
+    pinnedTier: pinnedTier as TierOrdinal,
+    attributionTier: user.tier,
     categorySlug: draft.categorySlug,
     tagSlugs: [...new Set([...draft.tagSlugs, ...proposed])],
     isNsfw: draft.isNsfw,
@@ -936,6 +951,23 @@ function handle(method: Method, path: string, options: RequestOptions): unknown 
       }
       return toPayload(currentTier(), next);
     }
+  }
+
+  const ownTierMatch = /^\/links\/([^/]+)\/tier$/.exec(path);
+  if (ownTierMatch?.[1] !== undefined && method === 'POST') {
+    const user = requireUser();
+    if (sanctionFor(user)?.types.includes('mute') === true) {
+      throw new ApiError(403, 'forbidden', 'this account is muted');
+    }
+    const row = findRow(ownTierMatch[1]);
+    if (row.authorId !== user.id) throw new ApiError(404, 'not_found', 'no such link');
+    const next = (options.body as { tier?: number | null } | undefined)?.tier ?? user.tier;
+    if (!canSetOwnTier({ tier: user.tier, permissions: viewerPermissions() }, effectiveTierOf(row), next)) {
+      throw new ApiError(403, 'forbidden', 'you can choose your own tier or, with permission, one below it');
+    }
+    const moved: Row = { ...row, pinnedTier: next as TierOrdinal };
+    state.rows = state.rows.map((candidate) => (candidate.publicId === row.publicId ? moved : candidate));
+    return toPayload(currentTier(), moved);
   }
 
   const voteMatch = /^\/links\/([^/]+)\/vote$/.exec(path);

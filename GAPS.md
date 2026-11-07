@@ -8,9 +8,11 @@ these are known, deliberate, and should not be rediscovered as bugs.
 
 **vote counts are globally true.** a limited user seeing a post at 14 points, in a tier where only a handful of accounts are visible, can infer that users exist above them and roughly how many. accepted in exchange for one score per post, one cache entry, and one consistent ranking.
 
-**polling reveals tier changes.** post visibility follows the author's current tier, and the api is open to per-user tokens. a client polling the feed on a timer sees batches of posts appear or vanish at once, and each batch is someone being promoted, demoted, or placed under a content hold. the payload never leaks — the timing does.
+**polling reveals content holds.** the api is open to per-user tokens, and a client polling the feed on a timer sees batches of posts appear or vanish at once. since posts stopped following their authors (`0005`), a promotion or demotion moves nothing, so a batch now means a content hold — or an author or admin moving posts one at a time. the payload never leaks — the timing does.
 
-this is the weakest point in the model and it is accepted knowingly. rate limits are the only mitigation and they are flat rather than tier-scaled, so they are a weak one. two fixes were considered and declined: jittered batching of tier changes, which costs the immediacy of promotion on an instance where that is a social moment; and tightening token reads to 60/min, which would collapse the channel's resolution from seconds to hours for one line of config. **the second is cheap and remains available** if the instance ever grows past the point where this matters.
+this was the weakest point in the model while posts followed their authors, when every tier change was a batch. it is much narrower now.
+
+what remains is accepted knowingly. rate limits are the only mitigation and they are flat rather than tier-scaled, so they are a weak one. two fixes were considered and declined: jittered batching of tier changes, which costs the immediacy of promotion on an instance where that is a social moment; and tightening token reads to 60/min, which would collapse the channel's resolution from seconds to hours for one line of config. **the second is cheap and remains available** if the instance ever grows past the point where this matters.
 
 **promotion is a retroactive reveal.** newly promoted users see the real authorship of everything at their new tier, including years-old posts. intentional.
 

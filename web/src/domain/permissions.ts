@@ -41,9 +41,17 @@ export interface ViewerCan {
   readonly retier: boolean;
   /** Acting on someone else's post: audited, and the author is notified. */
   readonly moderate: boolean;
+  /** The author choosing who can see their own post. */
+  readonly setTier: boolean;
 }
 
-export const NOTHING: ViewerCan = { edit: false, remove: false, retier: false, moderate: false };
+export const NOTHING: ViewerCan = {
+  edit: false,
+  remove: false,
+  retier: false,
+  moderate: false,
+  setTier: false,
+};
 
 export interface MatrixCell {
   readonly tier: number;
@@ -128,6 +136,25 @@ export function mayModerate(actor: Actor, subjectTier: number): boolean {
   return (
     actor.permissions.has('moderate') && actor.tier < TIER.owner && subjectTier < actor.tier
   );
+}
+
+/**
+ * An author moving their own post: never above themselves, narrowing always,
+ * widening with `postBelow`, and not a post a moderator pinned above them.
+ * `current` is where it lives; `next` null means "follow me".
+ */
+export function canSetOwnTier(author: Actor, current: number, next: number | null): boolean {
+  if (author.tier < TIER.limited || author.tier >= TIER.owner) return false;
+  if (current > author.tier) return false;
+  const target = next ?? author.tier;
+  if (target < TIER.limited || target > author.tier) return false;
+  return target >= current || author.permissions.has('postBelow');
+}
+
+export function canAdjustOwnTier(author: Actor, current: number): boolean {
+  if (author.tier < TIER.limited || author.tier >= TIER.owner || current > author.tier) return false;
+  if (current < author.tier) return true;
+  return author.tier > TIER.limited && author.permissions.has('postBelow');
 }
 
 const LABELS: Readonly<Record<number, AuthorTierLabel>> = {

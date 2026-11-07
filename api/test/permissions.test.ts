@@ -133,11 +133,11 @@ describe.skipIf(!enabled)('permissions', () => {
         viewerCan: Record<string, boolean>;
       }).viewerCan;
 
-    expect(await as('newbie')).toEqual({ edit: true, remove: true, retier: false, moderate: false });
-    expect(await as('staffer')).toEqual({ edit: true, remove: true, retier: false, moderate: true });
-    expect(await as('admin')).toEqual({ edit: true, remove: true, retier: true, moderate: true });
+    expect(await as('newbie')).toEqual({ edit: true, remove: true, retier: false, moderate: false, setTier: false });
+    expect(await as('staffer')).toEqual({ edit: true, remove: true, retier: false, moderate: true, setTier: false });
+    expect(await as('admin')).toEqual({ edit: true, remove: true, retier: true, moderate: true, setTier: false });
     // Full is above the post but holds no moderation by default.
-    expect(await as('member')).toEqual({ edit: false, remove: false, retier: false, moderate: false });
+    expect(await as('member')).toEqual({ edit: false, remove: false, retier: false, moderate: false, setTier: false });
 
     // Granting it lets full moderate limited, and only limited.
     expect((await set('admin', TIER.full, 'moderate', true)).status).toBe(200);
@@ -198,9 +198,69 @@ describe.skipIf(!enabled)('permissions', () => {
     expect(asStaff.viewerCan.moderate).toBe(false);
   });
 
+  it('lets an author move their own post: down with permission, back up always', async () => {
+    const posted = await call('staffer', 'POST', '/links', {
+      kind: 'text', title: 'oops, too public', body: 'body', categorySlug: 'misc', pinnedTier: TIER.limited,
+    });
+    expect(posted.status).toBe(201);
+    const body = (await posted.json()) as { publicId: string; pinnedTier: number | null; viewerCan: { setTier: boolean } };
+    expect(body.pinnedTier).toBe(TIER.limited);
+    expect(body.viewerCan.setTier).toBe(true);
+    const move = (as: string, tier: number | null) => call(as, 'POST', `/links/${body.publicId}/tier`, { tier });
+
+    // Nobody else, and never above the author.
+    expect((await move('admin', TIER.staff)).status).toBe(404);
+    expect((await move('staffer', TIER.admin)).status).toBe(403);
+
+    // Back up to their own tier, with no permission involved.
+    expect((await set('admin', TIER.staff, 'postBelow', false)).status).toBe(200);
+    const raised = await move('staffer', TIER.staff);
+    expect(raised.status).toBe(200);
+    expect(((await raised.json()) as { pinnedTier: number | null; editedAt: string | null })).toMatchObject({
+      pinnedTier: TIER.staff,
+      editedAt: null,
+    });
+    expect((await call('newbie', 'GET', `/links/${body.publicId}`)).status).toBe(404);
+
+    // Down again needs the permission.
+    expect((await move('staffer', TIER.full)).status).toBe(403);
+    expect((await set('admin', TIER.staff, 'postBelow', true)).status).toBe(200);
+    expect((await move('staffer', TIER.full)).status).toBe(200);
+
+    // Someone else's view of the post never carries the pin.
+    const asAdmin = (await (await call('admin', 'GET', `/links/${body.publicId}`)).json()) as object;
+    expect('pinnedTier' in asAdmin).toBe(false);
+  });
+
   it('honours a revoked editOwn without hiding the post', async () => {
     expect((await set('admin', TIER.limited, 'editOwn', false)).status).toBe(200);
     expect((await call('newbie', 'PATCH', `/links/${postId}`, { title: 'mine' })).status).toBe(403);
     expect((await set('admin', TIER.limited, 'editOwn', true)).status).toBe(200);
+  });
+
+  it('leaves a post exactly where it was, name and all, when its author is promoted', async () => {
+    const posted = await call('member', 'POST', '/links', {
+      kind: 'text', title: 'written for full', body: 'body', categorySlug: 'misc',
+    });
+    expect(posted.status).toBe(201);
+    const { publicId: id, pinnedTier } = (await posted.json()) as { publicId: string; pinnedTier: number };
+    expect(pinnedTier).toBe(TIER.full);
+
+    const seenBy = async (as: string) => {
+      const response = await call(as, 'GET', `/links/${id}`);
+      return response.status === 200 ? ((await response.json()) as { author: unknown }).author : null;
+    };
+    const before = { newbie: await seenBy('newbie'), staffer: await seenBy('staffer') };
+    expect(before.newbie).toEqual({ kind: 'tier', label: 'full' });
+
+    await db.user.update({ where: { id: who('member').id }, data: { tier: TIER.staff } });
+    try {
+      // Limited still sees it, as [full]; staff still see it by name. Nothing
+      // anyone can observe says the author moved.
+      expect(await seenBy('newbie')).toEqual(before.newbie);
+      expect(await seenBy('staffer')).toEqual(before.staffer);
+    } finally {
+      await db.user.update({ where: { id: who('member').id }, data: { tier: TIER.full } });
+    }
   });
 });

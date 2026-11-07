@@ -385,7 +385,7 @@ describe('attribution of a post pinned below its author', () => {
     // An admin's post, pinned down to limited.
     const row = {
       effective_tier: TIER.limited,
-      author_tier: TIER.admin,
+      attribution_tier: TIER.admin,
       author_public_id: 'u_admin',
       author_username: 'root',
     } as never;
@@ -396,8 +396,28 @@ describe('attribution of a post pinned below its author', () => {
     expect(authorPayload(viewerAt(TIER.admin), row)).toEqual({ kind: 'user', id: 'u_admin', name: 'root' });
 
     // Pinned *up* above a limited author: the old rule, unchanged.
-    const up = { effective_tier: TIER.full, author_tier: TIER.limited, author_public_id: 'u_l', author_username: 'dana' } as never;
+    const up = { effective_tier: TIER.full, attribution_tier: TIER.limited, author_public_id: 'u_l', author_username: 'dana' } as never;
     expect(authorPayload(viewerAt(TIER.limited), up)).toEqual({ kind: 'tier', label: 'full' });
     expect(authorPayload(viewerAt(TIER.full), up)).toMatchObject({ kind: 'user', name: 'dana' });
+  });
+});
+
+describe('an author moving their own post', () => {
+  it('allows narrowing always, widening with postBelow, and nothing above the author', async () => {
+    const { canSetOwnTier, canAdjustOwnTier, effectivePermissions } = await import('../src/permissions.js');
+    const full = { tier: TIER.full, permissions: effectivePermissions(TIER.full, new Map()) };
+    const fullBelow = { tier: TIER.full, permissions: new Set(['postBelow'] as const) };
+
+    // Posted to everyone by accident: back up to full needs nothing.
+    expect(canSetOwnTier(full, TIER.limited, null)).toBe(true);
+    expect(canSetOwnTier(full, TIER.limited, TIER.full)).toBe(true);
+    expect(canAdjustOwnTier(full, TIER.limited)).toBe(true);
+    // Down again does.
+    expect(canSetOwnTier(full, TIER.full, TIER.limited)).toBe(false);
+    expect(canSetOwnTier(fullBelow, TIER.full, TIER.limited)).toBe(true);
+    expect(canAdjustOwnTier(full, TIER.full)).toBe(false);
+    // Never above the author, and not a post a moderator pinned above them.
+    expect(canSetOwnTier(fullBelow, TIER.full, TIER.staff)).toBe(false);
+    expect(canSetOwnTier(fullBelow, TIER.staff, null)).toBe(false);
   });
 });

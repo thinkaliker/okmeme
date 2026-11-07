@@ -1,5 +1,5 @@
 import type { Viewer, ActiveSanction, ViewerUser } from './context.js';
-import { CAPABILITIES, mayModerate, type Capability } from './permissions.js';
+import { CAPABILITIES, canAdjustOwnTier, mayModerate, type Capability } from './permissions.js';
 import { isIdentified, tierLabel } from './tier.js';
 import { standingTier, type LinkRow, type TagRow } from './visibility.js';
 
@@ -78,14 +78,19 @@ export interface TagPayload {
 export interface ViewerCanPayload {
   edit: boolean;
   remove: boolean;
+  /** The admin re-tier, for someone else's post. Their own uses `setTier`. */
   retier: boolean;
   /** Acting on someone else's post, so it is audited and the author notified. */
   moderate: boolean;
+  /** The author choosing who can see their own post. */
+  setTier: boolean;
 }
 
 export function viewerCan(viewer: Viewer, row: LinkRow): ViewerCanPayload {
   const user = viewer.user;
-  if (user === null) return { edit: false, remove: false, retier: false, moderate: false };
+  if (user === null) {
+    return { edit: false, remove: false, retier: false, moderate: false, setTier: false };
+  }
 
   const muted = viewer.sanction !== null && viewer.sanction.types.includes('mute');
   const live = row.removed_at === null;
@@ -95,8 +100,9 @@ export function viewerCan(viewer: Viewer, row: LinkRow): ViewerCanPayload {
   return {
     edit: live && !muted && ((mine && viewer.permissions.has('editOwn')) || moderate),
     remove: live && !muted && (mine || moderate),
-    retier: viewer.permissions.has('retier'),
+    retier: !mine && viewer.permissions.has('retier'),
     moderate: live && !muted && moderate,
+    setTier: live && !muted && mine && canAdjustOwnTier(viewer, row.effective_tier),
   };
 }
 
@@ -134,6 +140,11 @@ export function linkPayload(
     editedAt: row.edited_at === null ? null : row.edited_at.toISOString(),
     removed,
     viewerCan: viewerCan(viewer, row),
+    // The author's own choice, sent only to the author: absent for everyone
+    // else rather than null, the same as an id on an above-tier author.
+    ...(viewer.user !== null && row.author_id === viewer.user.id
+      ? { pinnedTier: row.pinned_tier }
+      : {}),
   };
 
   // A removed post keeps its notice and loses its body.

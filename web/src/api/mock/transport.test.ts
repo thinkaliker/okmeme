@@ -339,11 +339,11 @@ describe('permissions', () => {
     );
     expect(byDana).toBeDefined();
     if (byDana === undefined) return;
-    expect(byDana.viewerCan).toEqual({ edit: true, remove: true, retier: true, moderate: true });
+    expect(byDana.viewerCan).toEqual({ edit: true, remove: true, retier: true, moderate: true, setTier: false });
 
     await loginAs('sandra'); // full: above dana, no moderation by default
     const asFull = await api.request<Link>('GET', `/links/${byDana.publicId}`);
-    expect(asFull.viewerCan).toEqual({ edit: false, remove: false, retier: false, moderate: false });
+    expect(asFull.viewerCan).toEqual({ edit: false, remove: false, retier: false, moderate: false, setTier: false });
 
     await loginAs('dana');
     const asAuthor = await api.request<Link>('GET', `/links/${byDana.publicId}`);
@@ -351,7 +351,7 @@ describe('permissions', () => {
 
     await loginAs(null);
     const anonymous = await api.request<Link>('GET', `/links/${byDana.publicId}`);
-    expect(anonymous.viewerCan).toEqual({ edit: false, remove: false, retier: false, moderate: false });
+    expect(anonymous.viewerCan).toEqual({ edit: false, remove: false, retier: false, moderate: false, setTier: false });
   });
 
   it('edits through PATCH and marks the post edited', async () => {
@@ -411,5 +411,43 @@ describe('editing tags', () => {
 
     await loginAs('root');
     await api.request('PATCH', '/admin/permissions', { body: { tier: 2, capability: 'moderate', granted: false } });
+  });
+});
+
+describe('an author moving their own post', () => {
+  const status = (promise: Promise<unknown>) =>
+    promise.then(() => 200, (error: { status: number }) => error.status);
+
+  it('raises an accidentally public post back up without any permission, and lowers it only with one', async () => {
+    await loginAs('pip'); // staff
+    const posted = await api.request<Link>('POST', '/links', {
+      body: {
+        kind: 'text', title: 'oops, too public', url: '', body: 'body', categorySlug: 'tech',
+        tagSlugs: [], newTagNames: [], isNsfw: false, pinnedTier: 1,
+      },
+    });
+    expect(posted.pinnedTier).toBe(1);
+    expect(posted.viewerCan.setTier).toBe(true);
+    const move = (tier: number | null) =>
+      api.request<Link>('POST', `/links/${posted.publicId}/tier`, { body: { tier } });
+
+    await loginAs('root');
+    await api.request('PATCH', '/admin/permissions', { body: { tier: 3, capability: 'postBelow', granted: false } });
+    // Someone else's view never carries the author's choice.
+    expect('pinnedTier' in (await api.request<Link>('GET', `/links/${posted.publicId}`))).toBe(false);
+    expect(await status(move(3))).toBe(404);
+
+    await loginAs('pip');
+    expect(await status(move(4))).toBe(403); // never above the author
+    const raised = await move(null);
+    expect(raised.pinnedTier).toBe(3); // their own tier, pinned
+    expect(raised.editedAt).toBeNull(); // not an edit
+    expect(await status(move(2))).toBe(403); // widening needs postBelow
+
+    await loginAs('dana');
+    expect(await status(api.request('GET', `/links/${posted.publicId}`))).toBe(404);
+
+    await loginAs('root');
+    await api.request('PATCH', '/admin/permissions', { body: { tier: 3, capability: 'postBelow', granted: true } });
   });
 });

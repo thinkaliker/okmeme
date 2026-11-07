@@ -145,6 +145,37 @@ export function mayModerate(actor: PermissionActor, subjectTier: number): boolea
   );
 }
 
+/**
+ * An author moving their own post. `current` is where it lives now (the
+ * effective tier); `next` is where they asked for it, null meaning their own.
+ *
+ * - Never above the author: a post there would wear a higher tier's label.
+ * - Narrowing, back toward the author's own tier, is always allowed. It can
+ *   only take the post away from people, so "that was an accident" never needs
+ *   a permission to undo.
+ * - Widening needs `postBelow`, the same permission the submit form asks for.
+ * - A post a moderator pinned *above* its author is theirs to manage, not the
+ *   author's.
+ */
+export function canSetOwnTier(
+  author: PermissionActor,
+  current: number,
+  next: number | null,
+): boolean {
+  if (author.tier < TIER.limited || author.tier >= TIER.owner) return false;
+  if (current > author.tier) return false;
+  const target = next ?? author.tier;
+  if (target < TIER.limited || target > author.tier) return false;
+  return target >= current || author.permissions.has('postBelow');
+}
+
+/** Whether any move is open to the author at all — what the cog shows. */
+export function canAdjustOwnTier(author: PermissionActor, current: number): boolean {
+  if (author.tier < TIER.limited || author.tier >= TIER.owner || current > author.tier) return false;
+  if (current < author.tier) return true;
+  return author.tier > TIER.limited && author.permissions.has('postBelow');
+}
+
 /* ---------------------------------------------------------------- the table */
 
 export interface MatrixCell {

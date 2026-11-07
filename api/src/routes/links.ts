@@ -6,7 +6,7 @@ import { db } from '../db.js';
 import { forbidden, invalid, notFound } from '../errors.js';
 import { publicId } from '../lib/ids.js';
 import { BUCKETS, limit } from '../ratelimit.js';
-import { mayModerate } from '../permissions.js';
+import { canSetOwnTier, mayModerate } from '../permissions.js';
 import { TIER } from '../tier.js';
 import { audit } from '../services/audit.js';
 import { canonicalize, hostOf } from '../services/canonical.js';
@@ -34,10 +34,10 @@ const submitSchema = z.object({
   newTagNames: z.array(z.string()).max(10).optional().default([]),
   isNsfw: z.boolean().optional().default(false),
   /**
-   * The tier the post lives at, when the author wants a wider audience than
-   * their own tier's. Absent or null follows the author, as every post always
-   * has. Never above the author: that would let them post under a higher
-   * tier's label.
+   * The tier the post lives at. Absent or null is the author's own tier; lower
+   * is a wider audience. The post stays there through the author's later
+   * promotions and demotions. Never above the author: that would let them post
+   * under a higher tier's label.
    */
   pinnedTier: z.number().int().min(TIER.limited).max(TIER.admin).nullable().optional().default(null),
 });
@@ -172,13 +172,11 @@ export function linkRoutes(): Hono<AppEnv> {
     if (draft.isNsfw && !viewer.permissions.has('postNsfw')) {
       throw forbidden('this tier cannot mark posts nsfw');
     }
-    // Posting at your own tier is the default, not a pin: it keeps following
-    // you if you are promoted, like every other post.
-    const pinnedTier = draft.pinnedTier === null || draft.pinnedTier === user.tier ? null : draft.pinnedTier;
-    if (pinnedTier !== null && pinnedTier > user.tier) {
-      throw forbidden('a post cannot live above its author');
-    }
-    if (pinnedTier !== null && !viewer.permissions.has('postBelow')) {
+    // Every post is pinned where it is posted, so promoting its author later
+    // neither takes it away from the tier it was written for nor relabels it.
+    const pinnedTier = draft.pinnedTier ?? user.tier;
+    if (pinnedTier > user.tier) throw forbidden('a post cannot live above its author');
+    if (pinnedTier < user.tier && !viewer.permissions.has('postBelow')) {
       throw forbidden('this tier cannot post to a lower tier');
     }
 
@@ -237,10 +235,11 @@ export function linkRoutes(): Hono<AppEnv> {
           faviconKey,
           categoryId: category.id,
           authorId: user.id,
-          // Audit only. Visibility reads the author's *current* tier, unless
-          // they chose a lower one here.
+          // Audit only.
           authorTierAtPost: user.tier,
           pinnedTier,
+          // Who may see the author's name on it, fixed now. See standingTier.
+          attributionTier: user.tier,
           isNsfw: draft.isNsfw,
         },
       });
@@ -395,6 +394,41 @@ export function linkRoutes(): Hono<AppEnv> {
         },
       });
     }
+
+    const updated = await findVisibleLink(viewer, row.public_id);
+    if (updated === null) throw notFound('no such link');
+    return c.json(await singleLink(viewer, updated));
+  });
+
+  /* -------------------------------------------------------------- author tier */
+
+  /**
+   * The author choosing who can see their own post, after the fact. Rules are
+   * in canSetOwnTier: never above themselves, narrowing always, widening with
+   * `postBelow`. Not an edit — the content is unchanged — so no revision row
+   * and no "edited" marker. Moderators re-tier through /admin, audited.
+   *
+   * Always a pin: null and the author's own tier both pin it there. Moving it
+   * never changes `attribution_tier`, the tier the author is named at.
+   */
+  app.post('/links/:publicId/tier', async (c) => {
+    const viewer = c.get('viewer');
+    const user = requireCanEdit(viewer);
+    await limit(BUCKETS.writes, viewer);
+
+    const row = await findVisibleLink(viewer, c.req.param('publicId'));
+    if (row === null || row.author_id !== user.id) throw notFound('no such link');
+
+    const body = await parse(
+      await c.req.json().catch(() => ({})),
+      z.object({ tier: z.number().int().min(TIER.limited).max(TIER.owner).nullable() }),
+    );
+    const next = body.tier ?? user.tier;
+    if (!canSetOwnTier(viewer, row.effective_tier, next)) {
+      throw forbidden('you can choose your own tier or, with permission, one below it');
+    }
+
+    await db.link.update({ where: { id: row.id }, data: { pinnedTier: next } });
 
     const updated = await findVisibleLink(viewer, row.public_id);
     if (updated === null) throw notFound('no such link');

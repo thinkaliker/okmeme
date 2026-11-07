@@ -54,29 +54,32 @@ the same rule applies to counts, timestamps of moderation actions, and anything 
 
 ## effective tier
 
-a post's visibility follows its **author's current tier**, not the tier they held when posting, unless a moderator has explicitly pinned it:
+a post **stays at the tier it was posted at**. every post is pinned when it is created — at its author's tier, or one they chose below it — and the author's later promotions and demotions do not move it:
 
 ```sql
 effective_tier = COALESCE(links.pinned_tier, author.tier)
 ```
 
-`links.author_tier_at_post` is recorded for the audit trail but is never consulted for visibility.
+the fallback to the author's tier survives only for a post an admin explicitly unpins. `links.author_tier_at_post` is recorded for the audit trail and is never consulted.
+
+this used to be the other way round: posts followed their author, so a promotion took a whole back catalogue away from the tier it was written for, and a demotion pushed it down in front of people it was never meant for. migration `0005` froze every existing post exactly where it was, so the switch changed nothing anyone could see.
 
 consequences to design around:
 
-- promotion and demotion retroactively move a user's entire back catalogue between tiers.
-- feed pages therefore cannot be cached across a tier change. cache keys include the viewer tier, ttls stay short, and any tier change invalidates them.
-- a moderator re-tier writes `pinned_tier`, which freezes that post permanently; the author's later movements no longer affect it.
-- a deleted account's posts are pinned at their last effective tier, so the join has something to resolve against.
-- an author may post *below* their own tier, for a wider audience, which writes `pinned_tier` the same way. never above it: a post living above its author would carry a higher tier's label, which is impersonating a rung. who may do it is the `postBelow` permission — staff and admin by default.
+- an author's tier changing moves none of their posts. what moves a post is its author re-tiering it, an admin re-tiering it, or a content hold.
+- feed pages still cannot be cached across those. cache keys include the viewer tier and ttls stay short.
+- an author may post *below* their own tier, for a wider audience, and move it again later — back up toward their own tier always, further down only with permission. never above themselves: a post living above its author would carry a higher tier's label, which is impersonating a rung. widening is the `postBelow` permission — staff and admin by default. a post a moderator pinned above its author stays where the moderator put it.
+- a deleted account's posts keep their pin, so the join has something to resolve against.
 
 ### a pin moves the post, not its author
 
 `effective_tier` decides who may *see* a post. it does not decide who may see its author's *name*. that follows the author's **standing** on the post:
 
 ```sql
-standing = GREATEST(effective_tier, author.tier)
+standing = GREATEST(effective_tier, links.attribution_tier)
 ```
+
+`attribution_tier` is the author's tier when they posted, fixed like the pin. it is not their current tier, because a promotion must not relabel old posts: a full user promoted to staff keeps their name on their old full-tier posts, for the readers who already knew it, and those readers learn nothing. reading the current tier would turn each of those posts into `[staff]` overnight — a public announcement of exactly who was promoted.
 
 a viewer is shown the name only when `standing <= viewer.tier`, and otherwise the label `min(standing, viewer.tier + 1)` — at most one rung up, like every other label. an admin's post pinned down to limited is visible to limited users as `[full]`, exactly like any other post from above them, and to anonymous visitors as `[limited]`. without this, every pin below an author would hand their real username to each tier it reached: a persistent identity crossing the tier wall, which is the one thing [author identity](#author-identity) rules out.
 

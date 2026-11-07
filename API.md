@@ -58,6 +58,7 @@ GET    /links/:public_id/revisions      admin + owner
 POST   /links
 PATCH  /links/:public_id
 DELETE /links/:public_id
+POST   /links/:public_id/tier      author only: { tier } — own tier (or null) or, with postBelow, below it
 POST   /links/:public_id/vote
 DELETE /links/:public_id/vote
 POST   /links/:public_id/bookmark
@@ -85,7 +86,9 @@ POST   /tags/:slug/approve     staff+
 DELETE /tags/:slug             staff+; rejects a pending proposal
 ```
 
-`POST /links` accepts an optional `pinnedTier`: a tier at or below the author's own for the post to live at, for a wider audience. null, absent, or the author's own tier all mean "follow the author", as before. a tier above the author's is refused, and anything else needs the `postBelow` permission. the author is still named only to viewers at or above their own tier — see [VISIBILITY.md](VISIBILITY.md#a-pin-moves-the-post-not-its-author).
+`POST /links` accepts an optional `pinnedTier`: a tier at or below the author's own for the post to live at. null or absent is the author's own tier. either way the post stays there through the author's later promotions and demotions. a tier above the author's is refused, and one below needs the `postBelow` permission. the author is still named only to viewers at or above their own tier — see [VISIBILITY.md](VISIBILITY.md#a-pin-moves-the-post-not-its-author).
+
+`POST /links/:public_id/tier` lets the author move their own post afterwards, under the same rules: never above their own tier; back toward it always, so a post sent out wider than meant can be pulled back without any permission; wider only with `postBelow`. a post a moderator pinned *above* its author is not theirs to move. it is not an edit — no revision row, no "edited" marker — and anyone else gets a 404. `tier` null is the author's own tier, pinned. the author's own posts carry `pinnedTier` (null only if an admin unpinned it), and nobody else's do: the field is absent, not null. `viewerCan.setTier` says whether any move is open; `viewerCan.retier`, the admin re-tier, is now false on the admin's own posts, which use this instead.
 
 `POST /links` accepts free-text tag names alongside slugs. the server slugifies them and decides what each becomes: an existing tag applied, or a proposal queued for staff. proposing a name someone else has already proposed joins that proposal and returns the same response as creating one — a different answer would say whether a stranger had proposed the word.
 

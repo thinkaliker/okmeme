@@ -75,8 +75,9 @@ a partial unique index on `(user_id) WHERE resolved_at IS NULL` permits one open
 | `thumb_key` | text null | blob store key, never a remote url |
 | `category_id` | bigint fk categories | exactly one |
 | `author_id` | bigint fk users | |
-| `author_tier_at_post` | smallint | audit only, never queried for visibility |
-| `pinned_tier` | smallint null | set by moderator re-tier, by an author posting below their own tier, or on author deletion |
+| `author_tier_at_post` | smallint | audit only, never queried |
+| `pinned_tier` | smallint null | where the post lives. set at posting — the author's tier or one they chose below it — and moved only by the author or an admin. null only if an admin unpins it, which makes it follow its author |
+| `attribution_tier` | smallint null | the author's tier when they posted, fixed. who may see their name: `GREATEST(pinned_tier, attribution_tier) <= viewer.tier`. null only on rows written before `0005`, read as the author's current tier |
 | `is_nsfw` | boolean | |
 | `created_at` / `edited_at` | timestamptz | |
 | `removed_at` | timestamptz null | soft delete |

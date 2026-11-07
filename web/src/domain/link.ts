@@ -60,6 +60,12 @@ interface LinkCommon {
    * cannot work it out: it never learns the tier an identified author is at.
    */
   readonly viewerCan: ViewerCan;
+  /**
+   * Present only on the viewer's own posts: the tier it lives at. Null only if
+   * an admin unpinned it, so it follows the author. Absent — not null — on
+   * anyone else's.
+   */
+  readonly pinnedTier?: number | null;
 }
 
 /** `PATCH /links/:id`. Absent fields are left as they are. */
@@ -152,9 +158,10 @@ export interface SubmitDraft {
   readonly newTagNames: readonly string[];
   readonly isNsfw: boolean;
   /**
-   * A lower tier for the post to live at, for a wider audience. Absent or null
-   * follows the author's own tier. Never above it — the server refuses that.
-   * Tiers it reaches below the author see a tier label, never the author's name.
+   * The tier for the post to live at. Absent or null is the author's own; lower
+   * is a wider audience. It stays there if the author is later promoted or
+   * demoted. Never above the author — the server refuses that. Tiers it reaches
+   * below the author see a tier label, never the author's name.
    */
   readonly pinnedTier?: number | null;
 }

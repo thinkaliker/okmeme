@@ -101,7 +101,9 @@ export const en = {
   'submit.visibilityEveryone': 'Everyone, including logged-out visitors',
   'submit.visibilityDefault': 'default',
   'submit.visibilityHelp':
-    'Tiers below yours see the post under a tier label, never your name. The choice is fixed once posted.',
+    'Tiers below yours see the post under a tier label, never your name. It stays here if your tier changes later; you can move it from the post’s cog.',
+  'linkEdit.visibilityNarrowOnly':
+    'Your tier can move this back toward your own, but not open it any wider.',
   'submit.nsfwHelp': 'NSFW is a permission boundary, not a tag. Limited users never receive these posts.',
   'submit.check': 'Check URL',
   'submit.checking': 'Checking',
@@ -401,7 +403,7 @@ export const en = {
 
   'linkEdit.open': 'Edit post',
   'linkEdit.title': 'Edit post',
-  'linkEdit.own': 'Your post shows an edited marker after any change.',
+  'linkEdit.own': 'Changing the text, tags or category shows an edited marker. Changing who can see it does not.',
   'linkEdit.moderating':
     'This is someone else’s post. The change is logged, the post shows an edited marker, and nobody is told who made it.',
   'linkEdit.postTitle': 'Title',

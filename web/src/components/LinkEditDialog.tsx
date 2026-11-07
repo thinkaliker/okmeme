@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { FieldHint, Input, Label, Select, Textarea } from '@/components/ui/field';
 import { Switch } from '@/components/ui/switch';
 import { TagPicker } from '@/components/TagPicker';
+import { VisibilityChoice } from '@/components/VisibilityChoice';
 import type { Category, Link, LinkPatch, Tag } from '@/domain/link';
 import { TIER, type AuthorTierLabel } from '@/domain/tier';
 import { t, tierLabel, tOptional } from '@/i18n/t';
@@ -47,8 +48,10 @@ interface LinkEditDialogProps {
  * server, and the moderator paths are audited there.
  */
 export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProps) {
-  const { allows } = useSession();
+  const { allows, tier: own } = useSession();
   const can = link.viewerCan;
+  /** Where the post lives now, for its author. Only their own posts carry it. */
+  const pinnedNow = link.pinnedTier ?? null;
 
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(link.title);
@@ -59,6 +62,7 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
   const [tags, setTags] = useState<readonly Tag[]>([]);
   const [tagSlugs, setTagSlugs] = useState<readonly string[]>(link.tags.map((tag) => tag.slug));
   const [newTagNames, setNewTagNames] = useState<readonly string[]>([]);
+  const [tierChoice, setTierChoice] = useState<number | null>(pinnedNow);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -80,7 +84,7 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
     return () => controller.abort();
   }, [open, can.edit]);
 
-  if (!can.edit && !can.remove && !can.retier) return null;
+  if (!can.edit && !can.remove && !can.retier && !can.setTier) return null;
 
   function reset() {
     setTitle(link.title);
@@ -89,6 +93,7 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
     setIsNsfw(link.isNsfw);
     setTagSlugs(link.tags.map((tag) => tag.slug));
     setNewTagNames([]);
+    setTierChoice(pinnedNow);
     setFailed(false);
     setConfirmRemove(false);
     setReason('');
@@ -132,14 +137,23 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
     // The whole list or nothing: the server replaces the post's tags with it.
     ...(tagsChanged ? { tagSlugs, newTagNames } : {}),
   };
-  const changed = Object.keys(patch).length > 0;
-  const valid = title.trim() !== '' && (link.kind !== 'text' || body.trim() !== '');
+  const contentChanged = can.edit && Object.keys(patch).length > 0;
+  // An unpinned post lives at its author's tier, so null and `own` are the same.
+  const tierChanged = can.setTier && (tierChoice ?? own) !== (pinnedNow ?? own);
+  const changed = contentChanged || tierChanged;
+  const valid = !can.edit || (title.trim() !== '' && (link.kind !== 'text' || body.trim() !== ''));
 
   const save = () =>
     run(async () => {
-      if (changed) onChange?.(await linksApi.edit(link.publicId, patch));
+      if (contentChanged) onChange?.(await linksApi.edit(link.publicId, patch));
+      // Separate, and not an edit: moving a post leaves no "edited" marker.
+      if (tierChanged) onChange?.(await linksApi.setTier(link.publicId, tierChoice));
       setOpen(false);
     });
+
+  // Back toward your own tier is always open; any wider needs the permission.
+  const livesAt = pinnedNow ?? own;
+  const widenLocked = (level: number) => level < livesAt && !allows('postBelow');
 
   const remove = () =>
     run(async () => {
@@ -200,7 +214,7 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
             {can.moderate ? t('linkEdit.moderating') : t('linkEdit.own')}
           </Dialog.Description>
 
-          {can.edit ? (
+          {can.edit || can.setTier ? (
             <form
               className="mt-4 flex flex-col gap-3"
               onSubmit={(event) => {
@@ -208,64 +222,79 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
                 if (valid) void save();
               }}
             >
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={id('title')}>{t('linkEdit.postTitle')}</Label>
-                <Input
-                  id={id('title')}
-                  value={title}
-                  maxLength={300}
-                  required
-                  onChange={(event) => setTitle(event.target.value)}
-                />
-              </div>
+              {can.edit ? (
+                <>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor={id('title')}>{t('linkEdit.postTitle')}</Label>
+                    <Input
+                      id={id('title')}
+                      value={title}
+                      maxLength={300}
+                      required
+                      onChange={(event) => setTitle(event.target.value)}
+                    />
+                  </div>
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={id('body')}>{t('linkEdit.body')}</Label>
-                <Textarea
-                  id={id('body')}
-                  value={body}
-                  maxLength={20_000}
-                  required={link.kind === 'text'}
-                  onChange={(event) => setBody(event.target.value)}
-                />
-              </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor={id('body')}>{t('linkEdit.body')}</Label>
+                    <Textarea
+                      id={id('body')}
+                      value={body}
+                      maxLength={20_000}
+                      required={link.kind === 'text'}
+                      onChange={(event) => setBody(event.target.value)}
+                    />
+                  </div>
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={id('category')}>{t('linkEdit.category')}</Label>
-                <Select
-                  id={id('category')}
-                  value={categorySlug}
-                  onChange={(event) => setCategorySlug(event.target.value)}
-                >
-                  {categoryOptions.map((category) => (
-                    <option key={category.slug} value={category.slug}>
-                      {tOptional(category.nameKey, category.name)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor={id('category')}>{t('linkEdit.category')}</Label>
+                    <Select
+                      id={id('category')}
+                      value={categorySlug}
+                      onChange={(event) => setCategorySlug(event.target.value)}
+                    >
+                      {categoryOptions.map((category) => (
+                        <option key={category.slug} value={category.slug}>
+                          {tOptional(category.nameKey, category.name)}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
 
-              <TagPicker
-                id={id('tags')}
-                available={tagOptions}
-                slugs={tagSlugs}
-                newNames={newTagNames}
-                onSlugsChange={setTagSlugs}
-                onNewNamesChange={setNewTagNames}
-                creates={allows('createTags')}
-                listClassName="max-h-32 overflow-y-auto"
-              />
-
-              {allows('postNsfw') || link.isNsfw ? (
-                <div className="flex items-center gap-3">
-                  <Switch
-                    id={id('nsfw')}
-                    checked={isNsfw}
-                    disabled={nsfwLocked}
-                    onCheckedChange={setIsNsfw}
+                  <TagPicker
+                    id={id('tags')}
+                    available={tagOptions}
+                    slugs={tagSlugs}
+                    newNames={newTagNames}
+                    onSlugsChange={setTagSlugs}
+                    onNewNamesChange={setNewTagNames}
+                    creates={allows('createTags')}
+                    listClassName="max-h-32 overflow-y-auto"
                   />
-                  <Label htmlFor={id('nsfw')}>{t('linkEdit.nsfw')}</Label>
-                </div>
+
+                  {allows('postNsfw') || link.isNsfw ? (
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        id={id('nsfw')}
+                        checked={isNsfw}
+                        disabled={nsfwLocked}
+                        onCheckedChange={setIsNsfw}
+                      />
+                      <Label htmlFor={id('nsfw')}>{t('linkEdit.nsfw')}</Label>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
+              {can.setTier ? (
+                <VisibilityChoice
+                  name={id('visibility')}
+                  own={own}
+                  value={tierChoice}
+                  onChange={setTierChoice}
+                  isDisabled={widenLocked}
+                  hint={allows('postBelow') ? t('submit.visibilityHelp') : t('linkEdit.visibilityNarrowOnly')}
+                />
               ) : null}
 
               <div className="flex justify-end gap-2">
@@ -284,9 +313,9 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
           {can.remove || can.retier ? (
             <section
               aria-labelledby={id('moderation')}
-              className={cn('flex flex-col gap-4', can.edit && 'mt-5 border-t border-border pt-4')}
+              className={cn('flex flex-col gap-4', (can.edit || can.setTier) && 'mt-5 border-t border-border pt-4')}
             >
-              <h3 id={id('moderation')} className={cn('text-sm font-semibold', !can.edit && 'mt-4')}>
+              <h3 id={id('moderation')} className={cn('text-sm font-semibold', !can.edit && !can.setTier && 'mt-4')}>
                 {t('linkEdit.moderation')}
               </h3>
 
@@ -371,7 +400,7 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
             </p>
           ) : null}
 
-          {can.edit ? null : (
+          {can.edit || can.setTier ? null : (
             <div className="mt-5 flex justify-end">
               <Dialog.Close asChild>
                 <Button variant="ghost" size="sm">

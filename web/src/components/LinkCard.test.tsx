@@ -62,7 +62,7 @@ describe('LinkCard', () => {
     renderCard({
       ...aboveTierLink,
       author: { kind: 'user', id: 'u_dana', name: 'dana' },
-      viewerCan: { edit: true, remove: true, retier: false, moderate: true },
+      viewerCan: { edit: true, remove: true, retier: false, moderate: true, setTier: false },
       tags: [{ slug: 'mine', name: 'mine', pending: false }],
     });
     fireEvent.click(screen.getByRole('button', { name: /edit post/i }));

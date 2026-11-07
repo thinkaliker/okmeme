@@ -268,6 +268,9 @@ model Link {
   authorId         BigInt     @map("author_id")
   authorTierAtPost Int        @map("author_tier_at_post") @db.SmallInt
   pinnedTier       Int?       @map("pinned_tier") @db.SmallInt
+  /// The tier the author is named at on this post, fixed when it is posted.
+  /// Null only on rows written by pre-0005 code; read as the author's tier.
+  attributionTier  Int?       @map("attribution_tier") @db.SmallInt
   isNsfw           Boolean    @default(false) @map("is_nsfw")
   createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   editedAt         DateTime?  @map("edited_at") @db.Timestamptz(6)
