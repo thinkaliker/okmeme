@@ -1,6 +1,6 @@
 import type { Viewer, ViewerUser } from '../context.js';
 import { forbidden, unauthenticated } from '../errors.js';
-import { TIER, can } from '../tier.js';
+import { TIER } from '../tier.js';
 
 /**
  * Sanctions, applied at the point of action.
@@ -12,6 +12,10 @@ import { TIER, can } from '../tier.js';
  * - `lockout` — handled in the middleware; the session can read the sanction and
  *   file one appeal, and nothing else.
  * - `content_hold` — a clause in the feed predicate, not a check here.
+ *
+ * The tier half of each check reads `viewer.permissions`, which an admin or
+ * owner may have adjusted for this tier (src/permissions.ts). Sanctions are
+ * per-account and apply on top of whatever the tier allows.
  */
 
 const has = (viewer: Viewer, type: string): boolean =>
@@ -20,7 +24,7 @@ const has = (viewer: Viewer, type: string): boolean =>
 export function requireCanSubmit(viewer: Viewer): ViewerUser {
   const user = viewer.user;
   if (user === null) throw unauthenticated();
-  if (!can.submit(user.tier)) {
+  if (!viewer.permissions.has('submit')) {
     throw forbidden(
       user.tier >= TIER.owner
         ? 'owner accounts cannot post, comment, or vote'
@@ -35,7 +39,7 @@ export function requireCanSubmit(viewer: Viewer): ViewerUser {
 export function requireCanVote(viewer: Viewer): ViewerUser {
   const user = viewer.user;
   if (user === null) throw unauthenticated();
-  if (!can.vote(user.tier)) throw forbidden('this tier cannot vote');
+  if (!viewer.permissions.has('vote')) throw forbidden('this tier cannot vote');
   if (has(viewer, 'mute')) throw forbidden('this account is muted');
   return user;
 }
@@ -43,7 +47,7 @@ export function requireCanVote(viewer: Viewer): ViewerUser {
 export function requireCanBookmark(viewer: Viewer): ViewerUser {
   const user = viewer.user;
   if (user === null) throw unauthenticated();
-  if (!can.bookmark(user.tier)) throw forbidden('this tier cannot bookmark');
+  if (!viewer.permissions.has('bookmark')) throw forbidden('this tier cannot bookmark');
   return user;
 }
 

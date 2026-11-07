@@ -1,4 +1,5 @@
 import type { Viewer, ActiveSanction, ViewerUser } from './context.js';
+import { CAPABILITIES, mayModerate, type Capability } from './permissions.js';
 import { isIdentified, tierLabel } from './tier.js';
 import type { LinkRow, TagRow } from './visibility.js';
 
@@ -56,6 +57,41 @@ export interface TagPayload {
   pending: boolean;
 }
 
+/**
+ * What this viewer may do to this one post, decided here so the client never
+ * has to know the tier a post lives at.
+ *
+ * It says nothing the viewer could not already find out by trying: `moderate`
+ * is only ever true for content strictly below their own tier, which they can
+ * already see by name, so it is never true for anything at or above the ring's
+ * edge. `edit` and `remove` on their own post tell them it is theirs, which
+ * they know.
+ */
+export interface ViewerCanPayload {
+  edit: boolean;
+  remove: boolean;
+  retier: boolean;
+  /** Acting on someone else's post, so it is audited and the author notified. */
+  moderate: boolean;
+}
+
+export function viewerCan(viewer: Viewer, row: LinkRow): ViewerCanPayload {
+  const user = viewer.user;
+  if (user === null) return { edit: false, remove: false, retier: false, moderate: false };
+
+  const muted = viewer.sanction !== null && viewer.sanction.types.includes('mute');
+  const live = row.removed_at === null;
+  const mine = row.author_id === user.id;
+  const moderate = !mine && mayModerate(viewer, row.effective_tier);
+
+  return {
+    edit: live && !muted && ((mine && viewer.permissions.has('editOwn')) || moderate),
+    remove: live && !muted && (mine || moderate),
+    retier: viewer.permissions.has('retier'),
+    moderate: live && !muted && moderate,
+  };
+}
+
 export function linkPayload(
   viewer: Viewer,
   row: LinkRow,
@@ -89,6 +125,7 @@ export function linkPayload(
     createdAt: row.created_at.toISOString(),
     editedAt: row.edited_at === null ? null : row.edited_at.toISOString(),
     removed,
+    viewerCan: viewerCan(viewer, row),
   };
 
   // A removed post keeps its notice and loses its body.
@@ -175,6 +212,7 @@ export function mePayload(
   user: ViewerUser,
   unread: number,
   sanction: ActiveSanction | null,
+  permissions: ReadonlySet<Capability>,
 ): Record<string, unknown> {
   return {
     publicId: user.publicId,
@@ -185,6 +223,8 @@ export function mePayload(
     display: displayPreferences(user.display),
     unreadNotifications: unread,
     sanction: sanction === null ? null : sanctionPayload(sanction),
+    // In catalogue order, so the list is stable for a given tier.
+    permissions: CAPABILITIES.filter((capability) => permissions.has(capability)),
     createdAt: user.createdAt.toISOString(),
   };
 }

@@ -4,6 +4,7 @@ import type {
   Category,
   FeedQuery,
   Link,
+  LinkPatch,
   PreviewResult,
   SearchQuery,
   SubmitDraft,
@@ -30,6 +31,7 @@ import type {
   SuspendInput,
 } from '@/domain/admin';
 import type { Notification } from '@/domain/notification';
+import type { Capability, PermissionMatrix } from '@/domain/permissions';
 import type { Page } from '@/domain/page';
 import type { TierOrdinal } from '@/domain/tier';
 import type { Me, MePatch } from '@/domain/user';
@@ -96,6 +98,23 @@ export const links = {
 
   bookmark(publicId: string, on: boolean): Promise<Link> {
     return transport.request<Link>(on ? 'POST' : 'DELETE', `/links/${publicId}/bookmark`);
+  },
+
+  /** The author, or a moderator strictly above the post's tier. */
+  edit(publicId: string, patch: LinkPatch): Promise<Link> {
+    return transport.request<Link>('PATCH', `/links/${publicId}`, { body: patch });
+  },
+
+  /**
+   * Soft delete. `reasonKey` is only recorded when a moderator removes someone
+   * else's post, and is shown with the notice — never with an actor.
+   */
+  remove(publicId: string, reasonKey?: string): Promise<void> {
+    return transport.request<void>(
+      'DELETE',
+      `/links/${publicId}`,
+      reasonKey === undefined ? {} : { query: { reason: reasonKey } },
+    );
   },
 };
 
@@ -202,6 +221,11 @@ export const me = {
   /** Regenerating invalidates all ten prior codes, used or not. */
   regenerateRecoveryCodes(): Promise<{ recoveryCodes: readonly string[] }> {
     return transport.request<{ recoveryCodes: readonly string[] }>('POST', '/me/recovery-codes');
+  },
+
+  /** The permission table: the viewer's own tier and below. */
+  permissions(extra?: Signal): Promise<PermissionMatrix> {
+    return transport.request<PermissionMatrix>('GET', '/me/permissions', options(undefined, extra));
   },
 
   deleteAccount(): Promise<void> {
@@ -345,6 +369,13 @@ export const admin = {
       '/admin/categories',
       options(undefined, extra),
     );
+  },
+
+  /** One cell; answers with the caller's refreshed table. Admin and owner. */
+  setPermission(tier: number, capability: Capability, granted: boolean): Promise<PermissionMatrix> {
+    return transport.request<PermissionMatrix>('PATCH', '/admin/permissions', {
+      body: { tier, capability, granted },
+    });
   },
 
   retierLink(publicId: string, tier: number | null): Promise<void> {

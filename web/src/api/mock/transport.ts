@@ -10,7 +10,20 @@ import {
 } from '@/api/mock/data';
 import type { AdminInvite } from '@/domain/admin';
 import type { Author } from '@/domain/author';
-import type { Category, Link, PreviewResult, SubmitDraft, Tag, TagProposal } from '@/domain/link';
+import type { Category, Link, LinkPatch, PreviewResult, SubmitDraft, Tag, TagProposal } from '@/domain/link';
+import {
+  CAPABILITIES,
+  NOTHING,
+  canEditCell,
+  defaultGrant,
+  effectivePermissions,
+  isCapability,
+  isConfigurable,
+  mayModerate,
+  permissionMatrix,
+  type Capability,
+  type ViewerCan,
+} from '@/domain/permissions';
 import type { Notification } from '@/domain/notification';
 import type { Page } from '@/domain/page';
 import {
@@ -134,6 +147,8 @@ interface State {
   proposals: Map<string, Proposal>;
   categories: Category[];
   invites: AdminInvite[];
+  /** Overridden cells of the permission table, per tier. Absent means default. */
+  permissionOverrides: Map<number, Map<Capability, boolean>>;
   nextId: number;
 }
 
@@ -151,6 +166,7 @@ const state: State = {
   proposals: new Map(),
   categories: [...MOCK_CATEGORIES],
   invites: seedInvites(),
+  permissionOverrides: new Map(),
   nextId: 1000,
 };
 
@@ -184,6 +200,20 @@ function currentUser(): MockUser | null {
 function currentTier(): ViewerTier {
   const user = currentUser();
   return user === null ? ANONYMOUS : viewerTier(user.tier);
+}
+
+function permissionsFor(tier: number): Set<Capability> {
+  return effectivePermissions(tier, state.permissionOverrides.get(tier) ?? new Map());
+}
+
+/** `viewer.permissions` on the server: read fresh on every request. */
+function viewerPermissions(): ReadonlySet<Capability> {
+  const user = currentUser();
+  return user === null ? new Set() : permissionsFor(user.tier);
+}
+
+function allows(capability: Capability): boolean {
+  return viewerPermissions().has(capability);
 }
 
 function prefsFor(user: MockUser): Prefs {
@@ -294,6 +324,23 @@ function hostOf(url: string): string {
   }
 }
 
+/** `viewerCan` in api/src/serialize.ts. */
+function viewerCanFor(row: Row): ViewerCan {
+  const user = currentUser();
+  if (user === null) return NOTHING;
+  const permissions = permissionsFor(user.tier);
+  const muted = sanctionFor(user)?.types.includes('mute') ?? false;
+  const live = row.removedAt === null;
+  const mine = row.authorId === user.id;
+  const moderate = !mine && mayModerate({ tier: user.tier, permissions }, effectiveTierOf(row));
+  return {
+    edit: live && !muted && ((mine && permissions.has('editOwn')) || moderate),
+    remove: live && !muted && (mine || moderate),
+    retier: permissions.has('retier'),
+    moderate: live && !muted && moderate,
+  };
+}
+
 /** Serialised the way the server would: already resolved for exactly this viewer. */
 function toPayload(viewer: ViewerTier, row: Row): Link {
   const removed = row.removedAt === null ? null : {
@@ -314,6 +361,7 @@ function toPayload(viewer: ViewerTier, row: Row): Link {
     createdAt: row.createdAt,
     editedAt: row.editedAt,
     removed,
+    viewerCan: viewerCanFor(row),
   };
 
   // A removed post keeps its notice and loses its body. The notice never names
@@ -445,6 +493,7 @@ function mePayload(user: MockUser): Me {
     display: prefs.display,
     unreadNotifications: unreadCount(user.id),
     sanction: sanctionFor(user),
+    permissions: CAPABILITIES.filter((capability) => permissionsFor(user.tier).has(capability)),
     createdAt: isoFromMinutes(60 * 24 * 400),
   };
 }
@@ -533,7 +582,7 @@ function resolveNewTags(names: readonly string[], user: MockUser): string[] {
       continue;
     }
 
-    if (user.tier >= TIER.staff) {
+    if (permissionsFor(user.tier).has('createTags')) {
       state.approvedTags.push({ slug, name: slug, pending: false });
       slugs.push(slug);
       continue;
@@ -558,11 +607,9 @@ function resolveNewTags(names: readonly string[], user: MockUser): string[] {
 function submit(draft: SubmitDraft): Link {
   const user = currentUser();
   if (user === null) throw new ApiError(401, 'unauthenticated', 'log in first');
-  if (user.tier < TIER.limited || user.tier >= TIER.owner) {
-    throw new ApiError(403, 'forbidden', 'this tier cannot post');
-  }
-  if (draft.isNsfw && user.tier < TIER.full) {
-    throw new ApiError(403, 'forbidden', 'nsfw requires the full tier');
+  if (!allows('submit')) throw new ApiError(403, 'forbidden', 'this tier cannot post');
+  if (draft.isNsfw && !allows('postNsfw')) {
+    throw new ApiError(403, 'forbidden', 'this tier cannot mark posts nsfw');
   }
 
   const proposed = resolveNewTags(draft.newTagNames, user);
@@ -794,18 +841,90 @@ function handle(method: Method, path: string, options: RequestOptions): unknown 
       if (row.removedAt !== null) {
         const user = currentUser();
         const mine = user !== null && user.id === row.authorId;
-        const mod = viewer >= TIER.staff;
+        const mod = allows('moderate') || allows('readAuditLog');
         if (!mine && !mod) throw new ApiError(404, 'not_found', 'no such link');
         return toPayload(viewer, row);
       }
       return toPayload(viewer, findRow(publicId));
     }
+
+    if (method === 'PATCH' || method === 'DELETE') {
+      const user = requireUser();
+      if (sanctionFor(user)?.types.includes('mute') === true) {
+        throw new ApiError(403, 'forbidden', 'this account is muted');
+      }
+      const row = findRow(publicId);
+      const mine = row.authorId === user.id;
+      const asModerator = !mine && mayModerate({ tier: user.tier, permissions: viewerPermissions() }, effectiveTierOf(row));
+      if (!mine && !asModerator) throw new ApiError(404, 'not_found', 'no such link');
+      const replaceRow = (next: Row) => {
+        state.rows = state.rows.map((candidate) => (candidate.publicId === publicId ? next : candidate));
+        return next;
+      };
+
+      if (method === 'DELETE') {
+        const reason = typeof options.query?.['reason'] === 'string' ? options.query['reason'] : undefined;
+        const { removedReasonKey: _dropped, ...rest } = row;
+        replaceRow({
+          ...rest,
+          removedAt: new Date().toISOString(),
+          ...(asModerator && reason !== undefined ? { removedReasonKey: reason } : {}),
+        });
+        return null;
+      }
+
+      if (mine && !allows('editOwn')) throw new ApiError(403, 'forbidden', 'this tier cannot edit its own posts');
+      const patch = (options.body ?? {}) as LinkPatch;
+      if (patch.isNsfw === true && !allows('postNsfw')) {
+        throw new ApiError(403, 'forbidden', 'this tier cannot mark posts nsfw');
+      }
+      if (patch.title !== undefined && patch.title.trim() === '') {
+        throw new ApiError(400, 'invalid_body', 'a title is required');
+      }
+      if (row.kind === 'text' && patch.body !== undefined && patch.body.trim() === '') {
+        throw new ApiError(400, 'missing_body', 'a text post needs a body');
+      }
+      if (patch.categorySlug !== undefined && !state.categories.some((c) => c.slug === patch.categorySlug)) {
+        throw new ApiError(400, 'bad_category', 'no such category');
+      }
+      // Same rule as the server: pending tags this editor cannot see are kept.
+      const seesPending = mine || user.tier >= TIER.staff;
+      const hidden = seesPending
+        ? []
+        : row.tagSlugs.filter((slug) => !state.approvedTags.some((tag) => tag.slug === slug));
+      const tagSlugs =
+        patch.tagSlugs === undefined && patch.newTagNames === undefined
+          ? row.tagSlugs
+          : [
+              ...new Set([
+                ...hidden,
+                ...(patch.tagSlugs ?? []),
+                ...resolveNewTags(patch.newTagNames ?? [], user),
+              ]),
+            ];
+      const { body: _body, ...withoutBody } = row;
+      const body = patch.body === undefined ? row.body : patch.body === '' ? undefined : patch.body;
+      const next = replaceRow({
+        ...withoutBody,
+        ...(body === undefined ? {} : { body }),
+        tagSlugs,
+        title: patch.title?.trim() ?? row.title,
+        categorySlug: patch.categorySlug ?? row.categorySlug,
+        isNsfw: patch.isNsfw ?? row.isNsfw,
+        editedAt: new Date().toISOString(),
+      });
+      // The edit may have moved it out of this viewer's NSFW preference.
+      if (!visibleTo(currentTier(), viewerShowsNsfw(), next)) {
+        throw new ApiError(404, 'not_found', 'no such link');
+      }
+      return toPayload(currentTier(), next);
+    }
   }
 
   const voteMatch = /^\/links\/([^/]+)\/vote$/.exec(path);
   if (voteMatch?.[1] !== undefined && (method === 'POST' || method === 'DELETE')) {
-    const user = requireUser();
-    if (user.tier >= TIER.owner) throw new ApiError(403, 'forbidden', 'owners cannot vote');
+    requireUser();
+    if (!allows('vote')) throw new ApiError(403, 'forbidden', 'this tier cannot vote');
     const row = findRow(voteMatch[1]);
     toggle(state.votes, row.publicId, method === 'POST');
     return toPayload(currentTier(), row);
@@ -814,6 +933,7 @@ function handle(method: Method, path: string, options: RequestOptions): unknown 
   const bookmarkMatch = /^\/links\/([^/]+)\/bookmark$/.exec(path);
   if (bookmarkMatch?.[1] !== undefined && (method === 'POST' || method === 'DELETE')) {
     requireUser();
+    if (!allows('bookmark')) throw new ApiError(403, 'forbidden', 'this tier cannot bookmark');
     const row = findRow(bookmarkMatch[1]);
     toggle(state.bookmarks, row.publicId, method === 'POST');
     return toPayload(currentTier(), row);
@@ -1022,6 +1142,45 @@ function handle(method: Method, path: string, options: RequestOptions): unknown 
   if (path === '/me/tokens' && method === 'GET') {
     requireUser();
     return EMPTY_PAGE;
+  }
+
+  if (path === '/me/permissions' && method === 'GET') {
+    const user = requireUser();
+    return permissionMatrix({ tier: user.tier, permissions: viewerPermissions() }, permissionsFor);
+  }
+
+  if (path === '/admin/permissions' && method === 'PATCH') {
+    const user = requireAdmin();
+    const body = (options.body ?? {}) as { tier?: unknown; capability?: unknown; granted?: unknown };
+    if (typeof body.tier !== 'number' || typeof body.granted !== 'boolean') {
+      throw new ApiError(400, 'invalid_body', 'tier, capability and granted are required');
+    }
+    if (!isCapability(body.capability)) throw new ApiError(400, 'bad_permission', 'no such permission');
+    const actor = { tier: user.tier, permissions: viewerPermissions() };
+    if (!isConfigurable(body.capability, body.tier) || !canEditCell(actor, body.tier, body.capability)) {
+      throw new ApiError(403, 'forbidden', 'you can only change permissions you hold, for tiers below yours');
+    }
+    const overrides = state.permissionOverrides.get(body.tier) ?? new Map<Capability, boolean>();
+    if (body.granted === defaultGrant(body.capability, body.tier)) overrides.delete(body.capability);
+    else overrides.set(body.capability, body.granted);
+    state.permissionOverrides.set(body.tier, overrides);
+    return permissionMatrix(actor, permissionsFor);
+  }
+
+  const retierMatch = /^\/admin\/links\/([^/]+)\/tier$/.exec(path);
+  if (retierMatch?.[1] !== undefined && method === 'POST') {
+    requireAdmin();
+    if (!allows('retier')) throw new ApiError(403, 'forbidden', 'not permitted');
+    const tier = (options.body as { tier?: unknown } | undefined)?.tier;
+    if (tier !== null && !(typeof tier === 'number' && Number.isInteger(tier) && tier >= 1 && tier <= 5)) {
+      throw new ApiError(400, 'invalid_body', 'a tier ordinal or null is required');
+    }
+    const row = state.rows.find((candidate) => candidate.publicId === retierMatch[1]);
+    if (row === undefined) throw new ApiError(404, 'not_found', 'no such link');
+    const { pinnedTier: _unpinned, ...rest } = row;
+    const next: Row = tier === null ? rest : { ...rest, pinnedTier: tier as TierOrdinal };
+    state.rows = state.rows.map((candidate) => (candidate.publicId === row.publicId ? next : candidate));
+    return null;
   }
 
   if (path.startsWith('/admin/') || path.startsWith('/owner/') || path === '/setup') {

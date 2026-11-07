@@ -1,5 +1,6 @@
 import { Link as RouterLink } from 'react-router-dom';
 import { AuthorLabel } from '@/components/AuthorLabel';
+import { LinkEditDialog } from '@/components/LinkEditDialog';
 import { Thumb } from '@/components/Thumb';
 import { Badge } from '@/components/ui/badge';
 import type { Link } from '@/domain/link';
@@ -19,9 +20,25 @@ import { formatScore } from '@/lib/utils';
  * the post's own page; a reveal button inside this link would be an interactive
  * element nested in another one.
  */
-export function GalleryTile({ link }: { link: Link }) {
+export function GalleryTile({ link, onChange }: { link: Link; onChange?: (next: Link) => void }) {
   const thumbKey = link.kind === 'text' ? null : link.thumbKey;
 
+  // The cog sits beside the link, not inside it: an interactive element nested
+  // in another one is the thing this tile is built to avoid.
+  return (
+    <div className="relative">
+      <Tile link={link} thumbKey={thumbKey} />
+      {/* Renders nothing unless the server says this viewer may act on it. */}
+      <LinkEditDialog
+        link={link}
+        onChange={onChange}
+        className="absolute right-1 top-1.5 size-7 bg-background/80 text-foreground hover:bg-background"
+      />
+    </div>
+  );
+}
+
+function Tile({ link, thumbKey }: { link: Link; thumbKey: string | null }) {
   return (
     <RouterLink
       to={`/l/${link.publicId}`}

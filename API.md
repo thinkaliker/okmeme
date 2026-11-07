@@ -69,6 +69,8 @@ POST   /links/preview          → canonicalize + visible-scope dedup check, pre
 
 `GET /search` runs the feed's predicate plus a tsvector match. it returns no result count, because a count of matches is a count of rows — including the ones the caller can't see.
 
+every link carries `viewerCan: { edit, remove, retier, moderate }`, resolved for the caller. the client cannot work these out itself — it never learns the tier an identified author is at — and they say nothing the caller could not learn by trying: `moderate` is only ever true for content strictly below the caller's tier, which they already see by name. `PATCH` and `DELETE /links/:public_id` accept the author (`PATCH` needs the `editOwn` permission) or a holder of `moderate` strictly above the post's effective tier; anyone else gets a 404. emptying a text post's body is refused.
+
 ### taxonomy
 
 ```http
@@ -96,6 +98,7 @@ DELETE /me                     tombstone; see SCHEMA.md
 GET    /me/bookmarks?cursor=
 GET    /me/notifications?cursor=&unread=
 POST   /me/notifications/read           mark all, or a list of ids
+GET    /me/permissions                  the permission table: the caller's tier and below
 GET    /me/tokens
 POST   /me/tokens
 DELETE /me/tokens/:public_id
@@ -103,7 +106,9 @@ POST   /me/recovery-codes               regenerate; invalidates all prior codes
 POST   /me/suspension/appeal            once per sanction; 409 if already filed
 ```
 
-`GET /me` carries any active sanction: type, expiry, reason category, and note.
+`GET /me` carries any active sanction: type, expiry, reason category, and note — and `permissions`, the list of capabilities the caller's tier holds on this instance.
+
+`GET /me/permissions` returns `{ tiers, rows }`: one column per tier from limited up to the caller's own, and only the rows some visible column holds or the caller can change. each cell is `{ tier, granted, editable }`. columns stop at the caller's tier rather than one above it, because a column of what the next rung may do says more about it than a bare label does.
 
 `GET /me/notifications` is the only channel that reaches a user about anything, since no mail is ever sent. payloads are subject to every rule in this document — a removal notification says `"moderator"` and nothing more.
 
@@ -148,7 +153,7 @@ POST   /admin/users/:public_id/suspend       types[], expires_at nullable, reaso
 POST   /admin/users/:public_id/unsuspend
 POST   /admin/users/:public_id/reset         issue fresh recovery codes
 GET    /admin/suspensions/indefinite         open-ended sanctions, oldest first
-POST   /admin/links/:public_id/tier          moderator re-tier → pinned_tier
+POST   /admin/links/:public_id/tier          moderator re-tier → pinned_tier; the `retier` permission (admin)
 GET    /admin/invites                        each with max_uses, expires_at, exhausted, and who used it — never a count
 POST   /admin/invites                        note, max_uses (default 1, null unlimited), ttl_days (default setting, null never)
 PATCH  /admin/invites/:id                    note, max_uses, expires_at; not below uses spent; not once revoked
@@ -157,6 +162,7 @@ GET    /admin/categories                     the editor's list: each category pl
 GET    /admin/audit?cursor=                  admin + owner
 GET    /admin/settings
 PATCH  /admin/settings
+PATCH  /admin/permissions                    one cell: tier, capability, granted; answers with the caller's table
 ```
 
 ### owner
@@ -167,6 +173,8 @@ POST   /owner/owners                         add another owner
 DELETE /owner/owners/:public_id              refused for the last remaining owner
 PATCH  /owner/settings                       owner-writable keys, incl. invite_min_tier
 ```
+
+`PATCH /admin/permissions` follows the discord rule: only for a tier strictly below the caller's, only on a configurable cell, and an admin only for a permission they hold themselves (owners are exempt — they hold almost nothing, by design). a value equal to the default deletes the override. every change is audited as `permission.updated`. see [VISIBILITY.md](VISIBILITY.md#permissions) for which cells are fixed and why.
 
 `/admin/*` and `/owner/*` are gated by tier on the server. hiding the admin panel in the frontend is presentation, not authorization.
 

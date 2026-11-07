@@ -95,6 +95,31 @@ this property is load-bearing. **if invite issuance is ever opened to a lower ti
 
 codes are hashed at rest, single-use and expiring after 14 days by default, and revocable at any time. with the defaults, a leaked code costs at most one account and stops mattering quickly. an admin can issue a code with more uses, unlimited uses, or no expiry; a leak of one of those costs as many accounts as it has uses left until it is revoked or expires, and the panel says so when one is issued. none of this changes the identity graph above — every code is still admin-issued, and only admins see who used which.
 
+## permissions
+
+the capability matrix is a default, not a constant. admins and owners can change it for tiers **below their own**, one cell at a time, and an admin can only grant or revoke a permission they hold themselves. every change is audited.
+
+configurable, with the lowest tier each may reach:
+
+| permission | default | may be granted down to |
+| --- | --- | --- |
+| post, vote, bookmark | limited–admin | limited |
+| edit own posts | limited–admin | limited |
+| mark posts nsfw | full–admin | full — limited never receives nsfw rows, so could not see its own post |
+| create tags without review | staff–admin | limited |
+| edit and remove lower tiers' posts | staff–admin | full — and only ever strictly below the moderator's own tier |
+
+fixed, because the ring depends on them:
+
+- **seeing nsfw** is a clause in the feed predicate, not a capability.
+- **issuing invites** below admin builds the identity graph described above. it is governed by `invite_min_tier` and nothing else.
+- **reports, suspensions, appeals, the audit log, and revisions** carry real names from every tier. they stay where everything is already visible.
+- **reviewing tags** stays at staff. proposals come from participants, so at most admin, and a staff reviewer reading `[admin]` is one rung — never two.
+- **re-tiering posts** stays admin.
+- **the owner column** never changes. nobody sits above an owner.
+
+what a viewer sees of the table obeys the ring like everything else: **columns stop at their own tier**, and a row appears only if some visible column holds it or they can change it. a limited user's table is four rows long and mentions nothing above them. the per-post `viewerCan` flags the edit cog reads are true only for content the viewer already sees by name or their own posts, so the cog's presence says nothing a 404 from the edit route would not.
+
 ## structural leaks and how they're closed
 
 things that leak through shape rather than content, and the rule that closes each:

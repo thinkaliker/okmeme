@@ -26,7 +26,7 @@ describe.skipIf(!enabled)('the app', () => {
       TRUNCATE links, users, categories, tags, link_tags, votes, link_scores,
                bookmarks, notifications, suspensions, appeals, reports,
                audit_log, invites, identities, sessions, api_tokens,
-               recovery_codes, recovery_requests, rate_limits
+               recovery_codes, recovery_requests, rate_limits, tier_permissions
       RESTART IDENTITY CASCADE
     `);
 

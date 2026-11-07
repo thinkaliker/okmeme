@@ -250,3 +250,130 @@ describe('dedup on submission', () => {
     expect(result.duplicate).not.toBeNull();
   });
 });
+
+describe('permissions', () => {
+  interface Matrix {
+    tiers: { tier: number; label: string }[];
+    rows: { capability: string; cells: { tier: number; granted: boolean; editable: boolean }[] }[];
+  }
+  const set = (tier: number, capability: string, granted: boolean) =>
+    api.request<Matrix>('PATCH', '/admin/permissions', { body: { tier, capability, granted } });
+  const status = (promise: Promise<unknown>) =>
+    promise.then(
+      () => 200,
+      (error: { status: number }) => error.status,
+    );
+
+  it('shows a limited viewer their own column and nothing about the tiers above', async () => {
+    await loginAs('dana');
+    const table = await api.request<Matrix>('GET', '/me/permissions');
+    expect(table.tiers.map((column) => column.label)).toEqual(['limited']);
+    expect(table.rows.map((row) => row.capability)).toEqual(['submit', 'vote', 'bookmark', 'editOwn']);
+  });
+
+  it('lets an admin change tiers below admin and nothing else', async () => {
+    await loginAs('root');
+    expect(await status(set(4, 'submit', false))).toBe(403);
+    expect(await status(set(2, 'seeNsfw', false))).toBe(403);
+    expect(await status(set(1, 'postNsfw', true))).toBe(403);
+
+    const table = await set(1, 'submit', false);
+    expect(table.rows.find((row) => row.capability === 'submit')?.cells[0]).toMatchObject({
+      granted: false,
+      editable: true,
+    });
+
+    await loginAs('dana');
+    const me = await api.request<{ permissions: string[] }>('GET', '/me');
+    expect(me.permissions).not.toContain('submit');
+
+    await loginAs('root');
+    await set(1, 'submit', true);
+  });
+
+  it('refuses the table to anyone below admin', async () => {
+    await loginAs('pip');
+    expect(await status(set(1, 'vote', false))).toBe(403);
+  });
+
+  it('tells each viewer what they may do to a post', async () => {
+    await loginAs('root');
+    const byDana = (await feed()).items.find(
+      (item) => item.author.kind === 'user' && item.author.name === 'dana',
+    );
+    expect(byDana).toBeDefined();
+    if (byDana === undefined) return;
+    expect(byDana.viewerCan).toEqual({ edit: true, remove: true, retier: true, moderate: true });
+
+    await loginAs('sandra'); // full: above dana, no moderation by default
+    const asFull = await api.request<Link>('GET', `/links/${byDana.publicId}`);
+    expect(asFull.viewerCan).toEqual({ edit: false, remove: false, retier: false, moderate: false });
+
+    await loginAs('dana');
+    const asAuthor = await api.request<Link>('GET', `/links/${byDana.publicId}`);
+    expect(asAuthor.viewerCan).toMatchObject({ edit: true, remove: true, moderate: false });
+
+    await loginAs(null);
+    const anonymous = await api.request<Link>('GET', `/links/${byDana.publicId}`);
+    expect(anonymous.viewerCan).toEqual({ edit: false, remove: false, retier: false, moderate: false });
+  });
+
+  it('edits through PATCH and marks the post edited', async () => {
+    await loginAs('root');
+    const target = (await feed()).items.find(
+      (item) => item.author.kind === 'user' && item.author.name === 'dana' && item.kind !== 'text',
+    );
+    expect(target).toBeDefined();
+    if (target === undefined) return;
+    const edited = await api.request<Link>('PATCH', `/links/${target.publicId}`, {
+      body: { title: 'retitled by a moderator' },
+    });
+    expect(edited.title).toBe('retitled by a moderator');
+    expect(edited.editedAt).not.toBeNull();
+  });
+});
+
+describe('editing tags', () => {
+  const tagSlugs = (link: Link) => link.tags.map((tag) => `${tag.slug}${tag.pending ? '?' : ''}`).sort();
+
+  it('replaces the list, creating new names outright for a tier that holds createTags', async () => {
+    await loginAs('dana');
+    const posted = await api.request<Link>('POST', '/links', {
+      body: {
+        kind: 'text', title: 'tag me', url: '', body: 'body', categorySlug: 'tech',
+        tagSlugs: ['longread'], newTagNames: [], isNsfw: false,
+      },
+    });
+
+    await loginAs('root');
+    const edited = await api.request<Link>('PATCH', `/links/${posted.publicId}`, {
+      body: { tagSlugs: [], newTagNames: ['freshword'] },
+    });
+    expect(tagSlugs(edited)).toEqual(['freshword']);
+  });
+
+  it('keeps a pending tag the editor could not see', async () => {
+    await loginAs('dana'); // limited: a new name is a proposal
+    const posted = await api.request<Link>('POST', '/links', {
+      body: {
+        kind: 'text', title: 'proposal inside', url: '', body: 'body', categorySlug: 'tech',
+        tagSlugs: ['longread'], newTagNames: ['danaword'], isNsfw: false,
+      },
+    });
+    expect(tagSlugs(posted)).toEqual(['danaword?', 'longread']);
+
+    await loginAs('root');
+    await api.request('PATCH', '/admin/permissions', { body: { tier: 2, capability: 'moderate', granted: true } });
+
+    await loginAs('sandra'); // full, now a moderator of limited, and blind to the proposal
+    const asModerator = await api.request<Link>('GET', `/links/${posted.publicId}`);
+    expect(tagSlugs(asModerator)).toEqual(['longread']);
+    await api.request('PATCH', `/links/${posted.publicId}`, { body: { tagSlugs: [], newTagNames: [] } });
+
+    await loginAs('dana');
+    expect(tagSlugs(await api.request<Link>('GET', `/links/${posted.publicId}`))).toEqual(['danaword?']);
+
+    await loginAs('root');
+    await api.request('PATCH', '/admin/permissions', { body: { tier: 2, capability: 'moderate', granted: false } });
+  });
+});

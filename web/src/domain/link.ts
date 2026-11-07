@@ -1,4 +1,5 @@
 import type { Author } from '@/domain/author';
+import type { ViewerCan } from '@/domain/permissions';
 export type { Author };
 
 export interface Category {
@@ -54,6 +55,25 @@ interface LinkCommon {
   readonly editedAt: string | null;
   /** Set when a moderator removed it. The actor is always "moderator". */
   readonly removed: RemovalNotice | null;
+  /**
+   * What this viewer may do to this post, decided by the server. The client
+   * cannot work it out: it never learns the tier an identified author is at.
+   */
+  readonly viewerCan: ViewerCan;
+}
+
+/** `PATCH /links/:id`. Absent fields are left as they are. */
+export interface LinkPatch {
+  readonly title?: string;
+  readonly body?: string;
+  readonly categorySlug?: string;
+  readonly isNsfw?: boolean;
+  /**
+   * Together with `newTagNames`, the post's whole tag list. Pending tags the
+   * editor cannot see are kept by the server rather than dropped.
+   */
+  readonly tagSlugs?: readonly string[];
+  readonly newTagNames?: readonly string[];
 }
 
 export interface RemovalNotice {

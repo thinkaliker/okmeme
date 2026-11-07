@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppEnv } from '../app.js';
-import { requireTier, requireTierOrHide } from '../context.js';
+import { requirePermission, requireTier, requireTierOrHide } from '../context.js';
 import { db } from '../db.js';
 import { conflict, invalid, notFound } from '../errors.js';
 import { isValidTagSlug, toCategorySlug, toTagSlug } from '../lib/slug.js';
@@ -151,7 +151,7 @@ export function taxonomyRoutes(): Hono<AppEnv> {
 
   app.post('/tags', async (c) => {
     const viewer = c.get('viewer');
-    const user = requireTier(viewer, TIER.staff);
+    const user = requirePermission(viewer, 'createTags');
 
     const body = z
       .object({ name: z.string().trim().min(1).max(24) })
@@ -161,8 +161,7 @@ export function taxonomyRoutes(): Hono<AppEnv> {
     const slug = toTagSlug(body.data.name);
     if (!isValidTagSlug(slug)) throw invalid('two characters or more, letters and numbers', 'bad_slug');
 
-    // Staff and above create outright, so this never produces a proposal. That
-    // is what keeps every pending row traceable to someone its reviewer can see.
+    // Holders of createTags create outright, so this never produces a proposal.
     const tag = await db.tag.upsert({
       where: { slug },
       update: { status: 'approved' },

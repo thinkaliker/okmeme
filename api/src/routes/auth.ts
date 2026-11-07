@@ -11,6 +11,7 @@ import { burnPasswordTime, verifyPassword } from '../lib/password.js';
 import { authProvider } from '../ports/auth/index.js';
 import { BUCKETS, limitByIp } from '../ratelimit.js';
 import { mePayload } from '../serialize.js';
+import { loadPermissions } from '../services/permissions.js';
 import {
   createAccount,
   createSession,
@@ -62,6 +63,7 @@ export function authRoutes(): Hono<AppEnv> {
         },
         await unreadCount(userId),
         sanction,
+        await loadPermissions(user.tier),
       ),
       sanction,
     };

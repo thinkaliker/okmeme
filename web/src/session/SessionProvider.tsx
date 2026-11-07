@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { ApiError } from '@/api/client';
 import { auth, me as meApi } from '@/api/endpoints';
+import { effectivePermissions, type Capability } from '@/domain/permissions';
 import type { Me } from '@/domain/user';
 import { ANONYMOUS, viewerTier, type ViewerTier } from '@/domain/tier';
 
@@ -15,6 +16,11 @@ import { ANONYMOUS, viewerTier, type ViewerTier } from '@/domain/tier';
 interface SessionContextValue {
   me: Me | null;
   tier: ViewerTier;
+  /**
+   * Whether the viewer's tier holds a permission on this instance, from the
+   * list `GET /me` carries. Anonymous holds none.
+   */
+  allows: (capability: Capability) => boolean;
   loading: boolean;
   refresh: () => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
@@ -53,17 +59,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setMe(null);
   }, []);
 
+  const permissions = useMemo<ReadonlySet<Capability>>(() => {
+    if (me === null) return new Set();
+    // An API from before adjustable permissions sends no list. Fall back to the
+    // defaults it still enforces rather than switching every control off.
+    const listed = me.permissions as readonly Capability[] | undefined;
+    return listed === undefined ? effectivePermissions(me.tier, new Map()) : new Set(listed);
+  }, [me]);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       me,
       tier: me === null ? ANONYMOUS : viewerTier(me.tier),
+      allows: (capability: Capability) => permissions.has(capability),
       loading,
       refresh: load,
       login,
       logout,
       update: setMe,
     }),
-    [me, loading, load, login, logout],
+    [me, permissions, loading, load, login, logout],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

@@ -1,3 +1,4 @@
+import type { Capability } from '@/domain/permissions';
 import type { TierOrdinal, ViewerTier } from '@/domain/tier';
 
 export type SuspensionType = 'mute' | 'submission_ban' | 'lockout' | 'content_hold';
@@ -54,6 +55,11 @@ export interface Me {
   readonly display: DisplayPreferences;
   readonly unreadNotifications: number;
   readonly sanction: Sanction | null;
+  /**
+   * What this viewer's tier may do on this instance, defaults plus any admin
+   * or owner adjustments. Presentation only; every route checks again.
+   */
+  readonly permissions: readonly Capability[];
   readonly createdAt: string;
 }
 

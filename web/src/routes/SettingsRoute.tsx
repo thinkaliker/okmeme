@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Check, Lock, Minus } from 'lucide-react';
 import { ApiError } from '@/api/client';
-import { auth, me as meApi } from '@/api/endpoints';
+import { admin, auth, me as meApi } from '@/api/endpoints';
 import { RecoveryCodes } from '@/components/RecoveryCodes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import { FieldHint, Input, Label, Textarea } from '@/components/ui/field';
 import { Switch } from '@/components/ui/switch';
 import { useDisplay } from '@/display/DisplayProvider';
 import type { ApiTokenSummary } from '@/domain/admin';
+import type { Capability, PermissionMatrix } from '@/domain/permissions';
 import { can, isAuthorTierLabel } from '@/domain/tier';
 import type { Density, FeedView, ThemePreference, Width } from '@/domain/user';
 import { t, tierLabel } from '@/i18n/t';
@@ -213,6 +215,8 @@ export default function SettingsRoute() {
         {codes === null ? null : <RecoveryCodes codes={codes} onAcknowledge={() => setCodes(null)} />}
       </section>
 
+      <PermissionsSection />
+
       <SecuritySection />
 
       <TokensSection />
@@ -254,6 +258,151 @@ export default function SettingsRoute() {
         </section>
       )}
     </div>
+  );
+}
+
+/* ---------------------------------------------------------------- permissions */
+
+const PERMISSION_LABEL: Readonly<Record<Capability, string>> = {
+  submit: t('permission.submit'),
+  vote: t('permission.vote'),
+  bookmark: t('permission.bookmark'),
+  editOwn: t('permission.editOwn'),
+  postNsfw: t('permission.postNsfw'),
+  createTags: t('permission.createTags'),
+  moderate: t('permission.moderate'),
+  seeNsfw: t('permission.seeNsfw'),
+  reviewTags: t('permission.reviewTags'),
+  retier: t('permission.retier'),
+  issueInvites: t('permission.issueInvites'),
+  reviewReports: t('permission.reviewReports'),
+  manageCategories: t('permission.manageCategories'),
+  readAuditLog: t('permission.readAuditLog'),
+  ownerSettings: t('permission.ownerSettings'),
+};
+
+/**
+ * What each tier may do, as a table. The server decides the shape: columns stop
+ * at the viewer's own tier, rows appear only when they apply to someone the
+ * viewer can see, and a cell is a checkbox only where this viewer may change it
+ * — below their own tier, and for an admin, a permission they hold themselves.
+ */
+function PermissionsSection() {
+  const [matrix, setMatrix] = useState<PermissionMatrix | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    meApi
+      .permissions({ signal: controller.signal })
+      .then(setMatrix)
+      .catch(() => setMatrix(null));
+    return () => controller.abort();
+  }, []);
+
+  if (matrix === null || matrix.rows.length === 0) return null;
+
+  const editor = matrix.rows.some((row) => row.cells.some((cell) => cell.editable));
+
+  async function toggle(tier: number, capability: Capability, granted: boolean) {
+    setSaving(true);
+    setFailed(false);
+    try {
+      setMatrix(await admin.setPermission(tier, capability, granted));
+    } catch {
+      setFailed(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section aria-labelledby="permissions-heading" className="flex flex-col gap-3">
+      <h2 id="permissions-heading" className="text-sm font-semibold">
+        {t('permission.title')}
+      </h2>
+      <FieldHint>{t('permission.intro')}</FieldHint>
+      {editor ? <FieldHint>{t('permission.editHint')}</FieldHint> : null}
+
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-border bg-muted/40">
+              {/* Pinned, so a phone scrolling an owner's five columns keeps
+                  the names in view. */}
+              <th scope="col" className="sticky left-0 bg-background px-3 py-2 text-left font-medium">
+                {t('permission.name')}
+              </th>
+              {matrix.tiers.map((column) => (
+                <th
+                  key={column.tier}
+                  scope="col"
+                  id={`perm-col-${column.tier}`}
+                  className="px-2 py-2 text-center font-medium"
+                >
+                  {/* A fixed server-chosen key, rendered through the one table
+                      that turns tier labels into words. */}
+                  <Badge variant="tier">{tierLabel(column.label)}</Badge>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.rows.map((row) => (
+              <tr key={row.capability} className="border-b border-border last:border-0">
+                <th
+                  scope="row"
+                  id={`perm-row-${row.capability}`}
+                  className="sticky left-0 bg-background px-3 py-2 text-left font-normal"
+                >
+                  <span className="flex items-center gap-1.5">
+                    {PERMISSION_LABEL[row.capability]}
+                    {row.locked ? (
+                      <span title={t('permission.locked')} className="text-muted-foreground">
+                        <Lock aria-hidden="true" className="size-3.5" />
+                        <span className="sr-only">{t('permission.locked')}</span>
+                      </span>
+                    ) : null}
+                  </span>
+                </th>
+                {row.cells.map((cell) => (
+                  <td key={cell.tier} className="px-2 py-2 text-center">
+                    {cell.editable ? (
+                      <input
+                        type="checkbox"
+                        checked={cell.granted}
+                        disabled={saving}
+                        aria-labelledby={`perm-row-${row.capability} perm-col-${cell.tier}`}
+                        onChange={(event) => void toggle(cell.tier, row.capability, event.target.checked)}
+                        className="size-4 cursor-pointer accent-primary align-middle"
+                      />
+                    ) : (
+                      <span title={cell.granted ? t('permission.granted') : t('permission.denied')}>
+                        {cell.granted ? (
+                          <Check aria-hidden="true" className="mx-auto size-4 text-primary" />
+                        ) : (
+                          <Minus aria-hidden="true" className="mx-auto size-4 text-muted-foreground/50" />
+                        )}
+                        <span className="sr-only">
+                          {cell.granted ? t('permission.granted') : t('permission.denied')}
+                        </span>
+                      </span>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {failed ? (
+        <p role="alert" className="text-sm text-destructive">
+          {t('permission.failed')}
+        </p>
+      ) : null}
+    </section>
   );
 }
 

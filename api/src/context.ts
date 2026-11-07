@@ -4,6 +4,8 @@ import { db } from './db.js';
 import { env } from './env.js';
 import { forbidden, notFound, unauthenticated } from './errors.js';
 import { hashToken } from './lib/ids.js';
+import type { Capability } from './permissions.js';
+import { loadPermissions } from './services/permissions.js';
 import { TIER } from './tier.js';
 
 /**
@@ -45,6 +47,12 @@ export interface Viewer {
   readonly showNsfw: boolean;
   readonly sanction: ActiveSanction | null;
   /**
+   * What this viewer's tier may do on this instance: the defaults in
+   * src/permissions.ts with any admin or owner overrides applied. Read per
+   * request, so a change lands on the next one. Empty when anonymous.
+   */
+  readonly permissions: ReadonlySet<Capability>;
+  /**
    * A locked-out user authenticates normally into a session authorised for
    * exactly two things: reading the sanction and filing one appeal. Refusing
    * the login outright would leave them with no channel at all, since nothing
@@ -60,6 +68,7 @@ export const ANONYMOUS_VIEWER = (ip: string): Viewer => ({
   tier: TIER.anonymous,
   showNsfw: false,
   sanction: null,
+  permissions: new Set(),
   lockedOut: false,
   via: 'anonymous',
   ip,
@@ -141,7 +150,7 @@ export async function resolveViewer(c: Context): Promise<Viewer> {
       .update({ where: { id: row.id }, data: { lastUsedAt: new Date() } })
       .catch(() => undefined);
 
-    return buildViewer(user, await loadSanction(user.id), 'token', ip);
+    return buildViewer(user, ...(await loadAccess(user)), 'token', ip);
   }
 
   const cookie = getCookie(c, env().cookieName);
@@ -155,15 +164,21 @@ export async function resolveViewer(c: Context): Promise<Viewer> {
     }
     const user = await loadUser(row.userId);
     if (user === null) return ANONYMOUS_VIEWER(ip);
-    return buildViewer(user, await loadSanction(user.id), 'cookie', ip);
+    return buildViewer(user, ...(await loadAccess(user)), 'cookie', ip);
   }
 
   return ANONYMOUS_VIEWER(ip);
 }
 
+const loadAccess = (
+  user: ViewerUser,
+): Promise<[ActiveSanction | null, ReadonlySet<Capability>]> =>
+  Promise.all([loadSanction(user.id), loadPermissions(user.tier)]);
+
 function buildViewer(
   user: ViewerUser,
   sanction: ActiveSanction | null,
+  permissions: ReadonlySet<Capability>,
   via: 'cookie' | 'token',
   ip: string,
 ): Viewer {
@@ -172,6 +187,7 @@ function buildViewer(
     tier: user.tier,
     showNsfw: user.showNsfw && user.tier >= TIER.full,
     sanction,
+    permissions,
     lockedOut: sanction !== null && sanction.types.includes('lockout'),
     via,
     ip,
@@ -199,6 +215,17 @@ export function requireTier(viewer: Viewer, minimum: number): ViewerUser {
 export function requireTierOrHide(viewer: Viewer, minimum: number): ViewerUser {
   const user = viewer.user;
   if (user === null || user.tier < minimum) throw notFound('no such route');
+  return user;
+}
+
+/** A permission check, 403 when the viewer's tier does not hold it. */
+export function requirePermission(
+  viewer: Viewer,
+  capability: Capability,
+  message?: string,
+): ViewerUser {
+  const user = requireUser(viewer);
+  if (!viewer.permissions.has(capability)) throw forbidden(message);
   return user;
 }
 

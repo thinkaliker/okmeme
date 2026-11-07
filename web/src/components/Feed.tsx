@@ -59,7 +59,12 @@ export function Feed({ fetchPage, deps, emptyTitle, emptyBody }: FeedProps) {
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 compact:gap-1 compact:sm:grid-cols-4 compact:lg:grid-cols-6">
           {items.map((link) => (
             <li key={link.publicId}>
-              <GalleryTile link={link} />
+              <GalleryTile
+                link={link}
+                onChange={(next) =>
+                  replace(next, (candidate) => candidate.publicId === link.publicId)
+                }
+              />
             </li>
           ))}
         </ul>

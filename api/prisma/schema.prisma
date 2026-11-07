@@ -440,6 +440,19 @@ model Setting {
   @@map("settings")
 }
 
+/// One overridden cell of the permission table. No row means the default in
+/// src/permissions.ts; owners and anonymous never have one.
+model TierPermission {
+  tier       Int      @db.SmallInt
+  capability String
+  granted    Boolean
+  updatedBy  BigInt?  @map("updated_by")
+  updatedAt  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@id([tier, capability])
+  @@map("tier_permissions")
+}
+
 model RateLimit {
   key         String   @id
   windowStart DateTime @map("window_start") @db.Timestamptz(6)

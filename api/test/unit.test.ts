@@ -9,9 +9,16 @@ import { canonicalize, hostOf } from '../src/services/canonical.js';
 import { isValidTagSlug, isValidUsername, toTagSlug } from '../src/lib/slug.js';
 import { splitStatements } from '../src/lib/migrate.js';
 import {
+  canEditCell,
+  effectivePermissions,
+  isConfigurable,
+  mayModerate,
+  permissionMatrix,
+  type Capability,
+} from '../src/permissions.js';
+import {
   TIER,
   can,
-  canModerateTier,
   canSetTier,
   isIdentified,
   isWithinRing,
@@ -51,10 +58,13 @@ describe('capabilities', () => {
   });
 
   it('lets staff moderate below them and admins moderate staff', () => {
-    expect(canModerateTier(TIER.staff, TIER.full)).toBe(true);
-    expect(canModerateTier(TIER.staff, TIER.staff)).toBe(false);
-    expect(canModerateTier(TIER.admin, TIER.staff)).toBe(true);
-    expect(canModerateTier(TIER.admin, TIER.admin)).toBe(false);
+    const as = (tier: number) => ({ tier, permissions: effectivePermissions(tier, new Map()) });
+    expect(mayModerate(as(TIER.staff), TIER.full)).toBe(true);
+    expect(mayModerate(as(TIER.staff), TIER.staff)).toBe(false);
+    expect(mayModerate(as(TIER.admin), TIER.staff)).toBe(true);
+    expect(mayModerate(as(TIER.admin), TIER.admin)).toBe(false);
+    expect(mayModerate(as(TIER.full), TIER.limited)).toBe(false);
+    expect(mayModerate(as(TIER.owner), TIER.limited)).toBe(false);
   });
 
   it('refuses to let an admin demote another admin', () => {
@@ -74,6 +84,104 @@ describe('capabilities', () => {
     // Outside the set, an owner may still re-tier anyone, admins included.
     expect(canSetTier(TIER.owner, TIER.admin, TIER.full)).toBe(true);
     expect(canSetTier(TIER.owner, TIER.limited, TIER.admin)).toBe(true);
+  });
+});
+
+describe('permissions', () => {
+  const none = new Map<Capability, boolean>();
+  const actor = (tier: number, overrides: ReadonlyMap<Capability, boolean> = none) => ({
+    tier,
+    permissions: effectivePermissions(tier, overrides),
+  });
+
+  it('defaults to exactly the fixed capability table', () => {
+    for (let tier = TIER.anonymous; tier <= TIER.owner; tier += 1) {
+      const granted = effectivePermissions(tier, none);
+      expect(granted.has('submit')).toBe(can.submit(tier));
+      expect(granted.has('vote')).toBe(can.vote(tier));
+      expect(granted.has('bookmark')).toBe(can.bookmark(tier));
+      expect(granted.has('postNsfw')).toBe(can.postNsfw(tier));
+      expect(granted.has('seeNsfw')).toBe(can.seeNsfw(tier));
+      expect(granted.has('createTags')).toBe(can.createTags(tier));
+      expect(granted.has('moderate')).toBe(can.moderateContent(tier));
+      expect(granted.has('reviewReports')).toBe(can.reviewReports(tier));
+      expect(granted.has('ownerSettings')).toBe(can.ownerSettings(tier));
+    }
+    expect(effectivePermissions(TIER.anonymous, none).size).toBe(0);
+  });
+
+  it('applies overrides only to configurable cells', () => {
+    const overrides = new Map<Capability, boolean>([
+      ['submit', false],
+      ['seeNsfw', true],
+      ['reviewReports', true],
+    ]);
+    const limited = effectivePermissions(TIER.limited, overrides);
+    expect(limited.has('submit')).toBe(false);
+    // Fixed rows ignore a stored override rather than trusting it.
+    expect(limited.has('seeNsfw')).toBe(false);
+    expect(limited.has('reviewReports')).toBe(false);
+  });
+
+  it('never lets the owner column, a locked row, or a cell below the floor change', () => {
+    expect(isConfigurable('submit', TIER.owner)).toBe(false);
+    expect(isConfigurable('seeNsfw', TIER.full)).toBe(false);
+    expect(isConfigurable('issueInvites', TIER.staff)).toBe(false);
+    expect(isConfigurable('readAuditLog', TIER.staff)).toBe(false);
+    // Limited never receives NSFW rows, so it cannot be allowed to post one.
+    expect(isConfigurable('postNsfw', TIER.limited)).toBe(false);
+    expect(isConfigurable('postNsfw', TIER.full)).toBe(true);
+    expect(isConfigurable('moderate', TIER.limited)).toBe(false);
+    expect(isConfigurable('moderate', TIER.full)).toBe(true);
+  });
+
+  it('lets admins and owners edit only tiers below their own', () => {
+    expect(canEditCell(actor(TIER.admin), TIER.staff, 'moderate')).toBe(true);
+    expect(canEditCell(actor(TIER.admin), TIER.admin, 'submit')).toBe(false);
+    expect(canEditCell(actor(TIER.owner), TIER.admin, 'submit')).toBe(true);
+    expect(canEditCell(actor(TIER.owner), TIER.owner, 'bookmark')).toBe(false);
+    expect(canEditCell(actor(TIER.staff), TIER.limited, 'submit')).toBe(false);
+    expect(canEditCell(actor(TIER.full), TIER.limited, 'submit')).toBe(false);
+  });
+
+  it('stops an admin handing out a permission they do not hold', () => {
+    const stripped = actor(TIER.admin, new Map([['moderate', false]]));
+    expect(canEditCell(stripped, TIER.staff, 'moderate')).toBe(false);
+    expect(canEditCell(stripped, TIER.staff, 'submit')).toBe(true);
+    // Owners hold almost nothing themselves and are exempt.
+    expect(canEditCell(actor(TIER.owner), TIER.staff, 'moderate')).toBe(true);
+  });
+
+  it('extends moderation to full when granted, and still only strictly downward', () => {
+    const full = actor(TIER.full, new Map([['moderate', true]]));
+    expect(mayModerate(full, TIER.limited)).toBe(true);
+    expect(mayModerate(full, TIER.full)).toBe(false);
+    expect(mayModerate(full, TIER.staff)).toBe(false);
+  });
+
+  it('shows a viewer their own tier and below, and only rows that apply', () => {
+    const grantsFor = (tier: number) => effectivePermissions(tier, none);
+
+    const limited = permissionMatrix(actor(TIER.limited), grantsFor);
+    expect(limited.tiers.map((column) => column.label)).toEqual(['limited']);
+    expect(limited.rows.map((row) => row.capability)).toEqual([
+      'submit',
+      'vote',
+      'bookmark',
+      'editOwn',
+    ]);
+    expect(limited.rows.every((row) => row.cells.every((cell) => !cell.editable))).toBe(true);
+
+    const admin = permissionMatrix(actor(TIER.admin), grantsFor);
+    expect(admin.tiers.map((column) => column.label)).toEqual(['limited', 'full', 'staff', 'admin']);
+    expect(admin.rows.some((row) => row.capability === 'ownerSettings')).toBe(false);
+    const moderate = admin.rows.find((row) => row.capability === 'moderate');
+    expect(moderate?.cells.map((cell) => cell.editable)).toEqual([false, true, true, false]);
+
+    const owner = permissionMatrix(actor(TIER.owner), grantsFor);
+    expect(owner.tiers).toHaveLength(5);
+    const ownerSubmit = owner.rows.find((row) => row.capability === 'submit');
+    expect(ownerSubmit?.cells.map((cell) => cell.editable)).toEqual([true, true, true, true, false]);
   });
 });
 
@@ -239,5 +347,31 @@ describe('the thumbnails migration', () => {
     const statements = splitStatements(sql);
     expect(statements).toHaveLength(1);
     expect(statements[0]).toContain('ON CONFLICT (key) DO NOTHING');
+  });
+});
+
+describe('permissions before the migration has run', () => {
+  it('falls back to the defaults when the table does not exist, and only then', async () => {
+    const { Prisma } = await import('@prisma/client');
+    const { db } = await import('../src/db.js');
+    const { loadPermissions } = await import('../src/services/permissions.js');
+    const { vi } = await import('vitest');
+
+    const missing = new Prisma.PrismaClientKnownRequestError('The table `tier_permissions` does not exist', {
+      code: 'P2021',
+      clientVersion: 'test',
+    });
+    const spy = vi.spyOn(db.tierPermission, 'findMany').mockRejectedValueOnce(missing);
+    const granted = await loadPermissions(TIER.staff);
+    expect(granted.has('moderate')).toBe(true);
+    expect(granted.has('reviewReports')).toBe(false);
+
+    const denied = new Prisma.PrismaClientKnownRequestError('permission denied for table tier_permissions', {
+      code: 'P2010',
+      clientVersion: 'test',
+    });
+    spy.mockRejectedValueOnce(denied);
+    await expect(loadPermissions(TIER.staff)).rejects.toBe(denied);
+    spy.mockRestore();
   });
 });

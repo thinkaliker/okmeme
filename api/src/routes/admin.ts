@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppEnv } from '../app.js';
-import { requireTier } from '../context.js';
+import { requirePermission, requireTier } from '../context.js';
 import { db } from '../db.js';
 import { conflict, forbidden, invalid, notFound } from '../errors.js';
 import { decodeCursor, parseLimit, toPage } from '../lib/cursor.js';
@@ -11,6 +11,7 @@ import { categoryPayload } from '../serialize.js';
 import { audit } from '../services/audit.js';
 import { issueRecoveryCodes, revokeAllCredentials } from '../services/accounts.js';
 import { notify } from '../services/notify.js';
+import { matrixFor, setPermission } from '../services/permissions.js';
 import { inviteMinTier, inviteTtlDays, setSetting, settingsWithTiers } from '../services/settings.js';
 import { TIER, canSetTier } from '../tier.js';
 
@@ -538,7 +539,8 @@ export function adminRoutes(): Hono<AppEnv> {
   /* -------------------------------------------------------------- link re-tier */
 
   app.post('/admin/links/:publicId/tier', async (c) => {
-    const actor = requireTier(c.get('viewer'), TIER.admin);
+    // Admin by default and fixed there; owners do not moderate content.
+    const actor = requirePermission(c.get('viewer'), 'retier');
 
     const body = z
       .object({ tier: z.number().int().min(1).max(5).nullable() })
@@ -875,6 +877,33 @@ export function adminRoutes(): Hono<AppEnv> {
   /* -------------------------------------------------------------- settings */
 
   app.get('/admin/settings', async (c) => c.json({ items: await settingsWithTiers() }));
+
+  /* -------------------------------------------------------------- permissions */
+
+  /**
+   * One cell at a time. The rules live in canEditCell: below your own tier,
+   * configurable at that tier, and — for admins — a permission you hold. The
+   * response is the caller's refreshed table, the same shape as
+   * `GET /me/permissions`.
+   */
+  app.patch('/admin/permissions', async (c) => {
+    const viewer = c.get('viewer');
+    const actor = requireTier(viewer, TIER.admin);
+
+    const body = z
+      .object({
+        tier: z.number().int().min(TIER.limited).max(TIER.owner),
+        capability: z.string().min(1).max(64),
+        granted: z.boolean(),
+      })
+      .safeParse(await c.req.json().catch(() => ({})));
+    if (!body.success) throw invalid('tier, capability and granted are required', 'invalid_body');
+
+    const self = { id: actor.id, tier: actor.tier, permissions: viewer.permissions };
+    await setPermission(self, body.data.tier, body.data.capability, body.data.granted);
+
+    return c.json(await matrixFor(self));
+  });
 
   app.patch('/admin/settings', async (c) => {
     const actor = requireTier(c.get('viewer'), TIER.admin);

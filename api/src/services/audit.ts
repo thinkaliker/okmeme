@@ -33,6 +33,7 @@ export type AuditAction =
   | 'appeal.resolved'
   | 'recovery.resolved'
   | 'settings.updated'
+  | 'permission.updated'
   | 'owner.added'
   | 'owner.removed'
   | 'setup.completed';

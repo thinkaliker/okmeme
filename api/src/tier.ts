@@ -52,6 +52,14 @@ export const isIdentified = (viewer: number, effective: number): boolean => effe
 
 /* ---------------------------------------------------------------- capabilities */
 
+/*
+ * These are the defaults. src/permissions.ts builds the per-tier table from
+ * them, and admins and owners may adjust the configurable cells for tiers below
+ * their own; request handlers check `viewer.permissions`, not this object.
+ * Moderating someone else's post is `mayModerate` there: the permission, plus
+ * the fixed rule that it only ever reaches strictly below the actor's tier.
+ */
+
 /** Owner is recovery and system settings only: it cannot post, comment, or vote. */
 const isParticipant = (tier: number): boolean => tier >= TIER.limited && tier < TIER.owner;
 
@@ -71,17 +79,6 @@ export const can = {
   adminPanel: (tier: number) => tier >= TIER.admin,
   ownerSettings: (tier: number) => tier >= TIER.owner,
 } as const;
-
-/**
- * Staff edit limited and full content; admins edit staff and below. Nobody
- * edits sideways, and admins cannot demote other admins.
- */
-export const canModerateTier = (actor: number, subject: number): boolean => {
-  if (actor >= TIER.owner) return false; // owner does not moderate content
-  if (actor >= TIER.admin) return subject <= TIER.staff;
-  if (actor >= TIER.staff) return subject <= TIER.full;
-  return false;
-};
 
 /**
  * An admin may promote up to admin; staff may promote up to full. Never above self.

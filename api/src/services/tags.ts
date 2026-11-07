@@ -10,15 +10,17 @@ import { audit } from './audit.js';
  * own post immediately but renders only to them and to staff until approved —
  * an unapproved word must not reach every reader on one person's say-so.
  *
- * Staff and above create tags outright and never produce a proposal, which is
- * what keeps the queue from leaking: every pending row traces back to someone
- * its reviewer can already see.
+ * Tiers holding `createTags` (staff and admin by default) create tags outright
+ * and never produce a proposal. Reviewing is fixed at staff and above and only
+ * participants post, so a proposer is at most admin and the reviewer who reads
+ * their label at least staff: never more than one rung apart.
  */
 export async function resolveTagIds(input: {
   slugs: readonly string[];
   names: readonly string[];
   authorId: bigint;
-  authorTier: number;
+  /** The author's tier holds `createTags`. */
+  approve: boolean;
 }): Promise<bigint[]> {
   const wanted = new Set<string>();
 
@@ -48,7 +50,7 @@ export async function resolveTagIds(input: {
       continue;
     }
 
-    const status = input.authorTier >= TIER.staff ? 'approved' : 'pending';
+    const status = input.approve ? 'approved' : 'pending';
     const created = await db.tag.upsert({
       where: { slug },
       update: {},

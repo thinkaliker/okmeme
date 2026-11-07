@@ -10,6 +10,7 @@ import { BUCKETS, limit } from '../ratelimit.js';
 import { displayPreferences, mePayload, notificationPayload } from '../serialize.js';
 import { issueRecoveryCodes, tombstoneUser } from '../services/accounts.js';
 import { linksPage } from '../services/linkpage.js';
+import { matrixFor } from '../services/permissions.js';
 import { unreadCount } from '../services/notify.js';
 import { TIER } from '../tier.js';
 
@@ -31,7 +32,9 @@ export function meRoutes(): Hono<AppEnv> {
   app.get('/me', async (c) => {
     const viewer = c.get('viewer');
     const user = requireUser(viewer);
-    return c.json(mePayload(user, await unreadCount(user.id), viewer.sanction));
+    return c.json(
+      mePayload(user, await unreadCount(user.id), viewer.sanction, viewer.permissions),
+    );
   });
 
   app.patch('/me', async (c) => {
@@ -69,8 +72,19 @@ export function meRoutes(): Hono<AppEnv> {
         },
         await unreadCount(user.id),
         viewer.sanction,
+        viewer.permissions,
       ),
     );
+  });
+
+  /**
+   * The permission table for the account page: columns for the viewer's own
+   * tier and below, and only rows that apply to them. See permissionMatrix.
+   */
+  app.get('/me/permissions', async (c) => {
+    const viewer = c.get('viewer');
+    const user = requireUser(viewer);
+    return c.json(await matrixFor({ tier: user.tier, permissions: viewer.permissions }));
   });
 
   /** Tombstone, not a delete. See SCHEMA.md — the posts keep resolving. */

@@ -61,7 +61,7 @@ function SearchForm() {
 }
 
 export function AppShell() {
-  const { me, tier, logout } = useSession();
+  const { me, tier, allows, logout } = useSession();
   const { width } = useDisplay();
   const [navOpen, setNavOpen] = useState(false);
   usePreferenceSync();
@@ -100,7 +100,7 @@ export function AppShell() {
           <div className="flex-1" />
           <SearchForm />
 
-          {can.submit(tier) ? (
+          {allows('submit') ? (
             <Button size="sm" asChild className="hidden sm:inline-flex">
               <RouterLink to="/submit">
                 <Plus />
@@ -150,7 +150,7 @@ export function AppShell() {
             <CategoryNav onNavigate={() => setNavOpen(false)} />
 
             <div className="flex flex-col gap-0.5 border-t border-border pt-3">
-              {can.submit(tier) ? (
+              {allows('submit') ? (
                 <Button variant="ghost" size="sm" asChild className="justify-start sm:hidden">
                   <RouterLink to="/submit" onClick={() => setNavOpen(false)}>
                     <Plus />

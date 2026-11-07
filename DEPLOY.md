@@ -838,6 +838,22 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO okmeme_app;
 REVOKE UPDATE, DELETE ON audit_log FROM okmeme_app;
 ```
 
+A grant on `ALL TABLES` covers the tables that exist when you run it. Make it
+cover the ones later migrations add, too, by running this as the role that
+runs migrations:
+
+```sql
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO okmeme_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO okmeme_app;
+```
+
+`0004_tier_permissions.sql` grants its own table to `okmeme_app` when a role by
+that name exists. If yours is called something else, grant `tier_permissions`
+to it after migrating — the table is read on every signed-in request, so a
+missing grant refuses all of them.
+
 Then point `DATABASE_URL` at `okmeme_app` and keep the owning role for
 migrations only.
 

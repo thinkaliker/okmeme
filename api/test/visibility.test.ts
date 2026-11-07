@@ -4,6 +4,7 @@ import { migrate } from '../src/lib/migrate.js';
 import { publicId } from '../src/lib/ids.js';
 import { TIER } from '../src/tier.js';
 import type { Viewer } from '../src/context.js';
+import { effectivePermissions } from '../src/permissions.js';
 import { findVisibleDuplicate, queryLinks, tagsForLinks } from '../src/visibility.js';
 import { authorPayload } from '../src/serialize.js';
 
@@ -33,6 +34,7 @@ const viewer = (tier: number, userId: bigint | null = null, showNsfw = false): V
   tier,
   showNsfw: showNsfw && tier >= TIER.full,
   sanction: null,
+  permissions: userId === null ? new Set() : effectivePermissions(tier, new Map()),
   lockedOut: false,
   via: userId === null ? 'anonymous' : 'cookie',
   ip: '203.0.113.1',

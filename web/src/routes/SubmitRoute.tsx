@@ -1,15 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { X } from 'lucide-react';
 import { links as linksApi, taxonomy } from '@/api/endpoints';
 import { ApiError } from '@/api/client';
+import { TagPicker } from '@/components/TagPicker';
 import { Button } from '@/components/ui/button';
 import { FieldHint, Input, Label, Select, Textarea } from '@/components/ui/field';
 import { Switch } from '@/components/ui/switch';
 import type { Category, LinkKind, PreviewResult, Tag } from '@/domain/link';
-import { can } from '@/domain/tier';
+import { TIER } from '@/domain/tier';
 import { t } from '@/i18n/t';
-import { isValidTagSlug, toTagSlug } from '@/lib/slug';
 import { useSession } from '@/session/SessionProvider';
 
 const KINDS: readonly LinkKind[] = ['link', 'text', 'media'];
@@ -21,7 +20,7 @@ const KIND_LABEL: Readonly<Record<LinkKind, string>> = {
 };
 
 export default function SubmitRoute() {
-  const { tier, me } = useSession();
+  const { tier, me, allows } = useSession();
   const navigate = useNavigate();
 
   const [kind, setKind] = useState<LinkKind>('link');
@@ -31,8 +30,6 @@ export default function SubmitRoute() {
   const [categorySlug, setCategorySlug] = useState('');
   const [tagSlugs, setTagSlugs] = useState<readonly string[]>([]);
   const [newTagNames, setNewTagNames] = useState<readonly string[]>([]);
-  const [tagDraft, setTagDraft] = useState('');
-  const [tagError, setTagError] = useState(false);
   const [isNsfw, setIsNsfw] = useState(false);
 
   const [categories, setCategories] = useState<readonly Category[]>([]);
@@ -65,34 +62,12 @@ export default function SubmitRoute() {
     );
   }
 
-  if (!can.submit(tier)) {
+  if (!allows('submit')) {
     return (
       <p className="rounded-lg border border-dashed border-border p-10 text-center text-sm">
-        {t('submit.ownerCannotPost')}
+        {tier >= TIER.owner ? t('submit.ownerCannotPost') : t('submit.tierCannotPost')}
       </p>
     );
-  }
-
-  /**
-   * Slugified here so the author sees the tag they will actually get rather than
-   * what they typed. The server slugifies again and its answer is the one that
-   * counts; this is only so `Two Words` does not look like it survived as-is.
-   */
-  function addTag() {
-    const slug = toTagSlug(tagDraft);
-    if (!isValidTagSlug(slug)) {
-      setTagError(true);
-      return;
-    }
-    setTagDraft('');
-    setTagError(false);
-    // Already offered as a checkbox, or already queued: tick it instead of
-    // adding a duplicate that the server would merge anyway.
-    if (tags.some((tag) => tag.slug === slug)) {
-      setTagSlugs((current) => (current.includes(slug) ? current : [...current, slug]));
-      return;
-    }
-    setNewTagNames((current) => (current.includes(slug) ? current : [...current, slug]));
   }
 
   async function check() {
@@ -228,83 +203,17 @@ export default function SubmitRoute() {
         </Select>
       </div>
 
-      <fieldset className="flex flex-col gap-3">
-        <legend className="text-sm font-medium">{t('submit.tags')}</legend>
-        <div className="flex flex-wrap gap-2">
-          {tags.map((tag) => {
-            const checked = tagSlugs.includes(tag.slug);
-            return (
-              <label
-                key={tag.slug}
-                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs has-checked:border-primary has-checked:bg-accent"
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() =>
-                    setTagSlugs((current) =>
-                      checked ? current.filter((slug) => slug !== tag.slug) : [...current, tag.slug],
-                    )
-                  }
-                  className="accent-primary"
-                />
-                #{tag.name}
-              </label>
-            );
-          })}
-        </div>
+      <TagPicker
+        id="submit"
+        available={tags}
+        slugs={tagSlugs}
+        newNames={newTagNames}
+        onSlugsChange={setTagSlugs}
+        onNewNamesChange={setNewTagNames}
+        creates={allows('createTags')}
+      />
 
-        {newTagNames.length === 0 ? null : (
-          <ul className="flex flex-wrap gap-2">
-            {newTagNames.map((name) => (
-              <li key={name}>
-                <span className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-primary px-2 py-1 text-xs">
-                  #{name}
-                  <span className="text-muted-foreground">{t('tag.pending')}</span>
-                  <button
-                    type="button"
-                    aria-label={`${t('submit.removeTag')} #${name}`}
-                    className="text-muted-foreground hover:text-foreground"
-                    onClick={() => setNewTagNames((current) => current.filter((n) => n !== name))}
-                  >
-                    <X className="size-3" aria-hidden="true" />
-                  </button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="submit-new-tag">{t('submit.newTag')}</Label>
-          <div className="flex gap-2">
-            <Input
-              id="submit-new-tag"
-              value={tagDraft}
-              maxLength={32}
-              placeholder={t('submit.newTagPlaceholder')}
-              onChange={(event) => {
-                setTagDraft(event.target.value);
-                setTagError(false);
-              }}
-              /* Enter adds a tag rather than submitting the post — a form with a
-                 single text field otherwise submits on Enter, which would post
-                 a half-written draft. */
-              onKeyDown={(event) => {
-                if (event.key !== 'Enter') return;
-                event.preventDefault();
-                addTag();
-              }}
-            />
-            <Button type="button" variant="outline" onClick={addTag} disabled={tagDraft.trim() === ''}>
-              {t('submit.addTag')}
-            </Button>
-          </div>
-          <FieldHint>{tagError ? t('submit.newTagInvalid') : t('submit.newTagHelp')}</FieldHint>
-        </div>
-      </fieldset>
-
-      {can.postNsfw(tier) ? (
+      {allows('postNsfw') ? (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-3">
             <Switch id="submit-nsfw" checked={isNsfw} onCheckedChange={setIsNsfw} />

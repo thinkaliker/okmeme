@@ -152,6 +152,10 @@ append-only, enforced at the database role level rather than in application code
 
 `thumbnails_enabled` switches media derivation off for an instance with nowhere to keep bytes. it is admin-writable and cosmetic: with it false nothing is fetched, nothing is stored, `/thumb/:key` 404s, and links render with the tinted host letter. `BLOB_STORE=none` forces it false regardless, so an admin cannot enable a feature the deployment cannot serve. it never causes a fallback to the source host — see [VISIBILITY.md](VISIBILITY.md).
 
+**tier_permissions** — `tier` smallint (1–4), `capability` text, `granted` boolean, `updated_by`, `updated_at`, pk `(tier, capability)`.
+
+one row per overridden cell of the permission table; no row means the default in `api/src/permissions.ts`, so an untouched instance behaves exactly as the fixed capability table always did. owners and anonymous have no rows by construction. the api applies an override only where the catalogue says the cell is configurable and ignores any other. read on every authenticated request, like the sanction, so a change lands on the next request.
+
 `invite_min_tier` is the one setting that is **owner-writable only**. lowering it below admin converts the invite table into a cross-tier identity graph, is audited, and is irreversible in effect — raising it back does not unbuild what it created. see [VISIBILITY.md](VISIBILITY.md).
 
 ## the visibility predicate

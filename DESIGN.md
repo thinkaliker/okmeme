@@ -80,7 +80,9 @@ admins cannot demote other admins. owner is a **set**, not a single account: any
 
 promotion is manual and always granted from above. this is consistent with the visibility model: since lower tiers see nothing but a bare tier label, nobody can build reputation downward, so the only people who can assess you are the people who can already see you.
 
-the full capability matrix and the visibility rules are in [VISIBILITY.md](VISIBILITY.md).
+the table above is the default. admins and owners may adjust what a tier *below their own* may do — posting, voting, editing their own posts, marking nsfw, creating tags without review, moderating lower tiers — the way discord roles work: never your own tier or above, and an admin never hands out something they do not hold. the rules the ring depends on are fixed and shown as such. every user sees the table for their own tier and below on their account page.
+
+the full capability matrix, what is fixed, and the visibility rules are in [VISIBILITY.md](VISIBILITY.md).
 
 ## links
 

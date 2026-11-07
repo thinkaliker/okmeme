@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { LinkCard } from '@/components/LinkCard';
 import type { Link } from '@/domain/link';
+import { NOTHING } from '@/domain/permissions';
 import { hueFor } from '@/lib/tint';
 import { SessionProvider } from '@/session/SessionProvider';
 
@@ -25,6 +26,7 @@ const base = {
   createdAt: new Date().toISOString(),
   editedAt: null,
   removed: null,
+  viewerCan: NOTHING,
 } as const;
 
 const aboveTierLink: Link = {
@@ -51,6 +53,31 @@ function renderCard(link: Link) {
 afterEach(cleanup);
 
 describe('LinkCard', () => {
+  it('shows no cog unless the server says this viewer may act on the post', () => {
+    renderCard(aboveTierLink);
+    expect(screen.queryByRole('button', { name: /edit post/i })).toBeNull();
+  });
+
+  it('opens an edit dialog from the cog, with only the parts allowed', async () => {
+    renderCard({
+      ...aboveTierLink,
+      author: { kind: 'user', id: 'u_dana', name: 'dana' },
+      viewerCan: { edit: true, remove: true, retier: false, moderate: true },
+      tags: [{ slug: 'mine', name: 'mine', pending: false }],
+    });
+    fireEvent.click(screen.getByRole('button', { name: /edit post/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect((screen.getByLabelText(/title/i) as HTMLInputElement).value).toBe('a title');
+    expect(screen.getByLabelText(/reason/i)).toBeDefined();
+    expect(screen.getByRole('button', { name: /remove post/i })).toBeDefined();
+    // Re-tier is admin-only and the payload said no.
+    expect(screen.queryByLabelText(/pin to tier/i)).toBeNull();
+    // The post's own tags are ticked, ready to be kept or dropped.
+    expect((screen.getByRole('checkbox', { name: /#mine/ }) as HTMLInputElement).checked).toBe(true);
+    expect(dialog.textContent).toMatch(/someone else/i);
+  });
+
   it('renders an above-tier author as a bare label and nothing more', () => {
     renderCard(aboveTierLink);
     expect(screen.getByText('full')).toBeDefined();

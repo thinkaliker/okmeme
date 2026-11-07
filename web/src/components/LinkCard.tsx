@@ -14,6 +14,7 @@ import { links as linksApi } from '@/api/endpoints';
 import { faviconUrl } from '@/api/media';
 import { AuthorLabel } from '@/components/AuthorLabel';
 import { Expando, useDisclosure } from '@/components/Expando';
+import { LinkEditDialog } from '@/components/LinkEditDialog';
 import { ReportDialog } from '@/components/ReportDialog';
 import { Thumb } from '@/components/Thumb';
 import { VoteControl } from '@/components/VoteControl';
@@ -21,7 +22,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import type { Link, MediaType } from '@/domain/link';
-import { can } from '@/domain/tier';
 import { t, tOptional } from '@/i18n/t';
 import { hostInitial, tintChip, tintEdge } from '@/lib/tint';
 import { absoluteTime, cn, relativeTime } from '@/lib/utils';
@@ -113,7 +113,7 @@ const tagPill =
  * also interactive, which is what the old card got wrong.
  */
 export function LinkCard({ link, onChange, headingLevel = 2, expanded = false }: LinkCardProps) {
-  const { tier, me } = useSession();
+  const { allows, me } = useSession();
   const [pending, setPending] = useState(false);
   const Heading = headingLevel === 1 ? 'h1' : 'h2';
 
@@ -295,7 +295,7 @@ export function LinkCard({ link, onChange, headingLevel = 2, expanded = false }:
           </RouterLink>
         </Button>
 
-        {can.bookmark(tier) ? (
+        {allows('bookmark') ? (
           <Button
             type="button"
             variant="ghost"
@@ -311,6 +311,10 @@ export function LinkCard({ link, onChange, headingLevel = 2, expanded = false }:
         ) : null}
 
         {me === null ? null : <ReportDialog subject={{ type: 'link', publicId: link.publicId }} />}
+
+        {/* Renders nothing unless the server says this viewer may act on this
+            post — the client never knows the tier an author is at. */}
+        <LinkEditDialog link={link} onChange={onChange} />
       </div>
     </Card>
   );

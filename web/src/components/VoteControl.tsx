@@ -1,6 +1,5 @@
 import { ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { can } from '@/domain/tier';
 import type { Link } from '@/domain/link';
 import { useSession } from '@/session/SessionProvider';
 import { t } from '@/i18n/t';
@@ -20,8 +19,8 @@ interface VoteControlProps {
  * in a list is a count of the rows above it, including the hidden ones.
  */
 export function VoteControl({ link, onVote, pending = false, orientation = 'row' }: VoteControlProps) {
-  const { tier } = useSession();
-  const allowed = can.vote(tier);
+  const { allows } = useSession();
+  const allowed = allows('vote');
   const voted = link.viewerVote === 1;
 
   return (

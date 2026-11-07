@@ -6,7 +6,8 @@ import { db } from '../db.js';
 import { forbidden, invalid, notFound } from '../errors.js';
 import { publicId } from '../lib/ids.js';
 import { BUCKETS, limit } from '../ratelimit.js';
-import { TIER, canModerateTier } from '../tier.js';
+import { mayModerate } from '../permissions.js';
+import { TIER } from '../tier.js';
 import { audit } from '../services/audit.js';
 import { canonicalize, hostOf } from '../services/canonical.js';
 import {
@@ -68,8 +69,12 @@ export function linkRoutes(): Hono<AppEnv> {
     // a 404, because "hidden" and "does not exist" must be one answer.
     const removed = await findVisibleLink(viewer, id, true);
     if (removed !== null && removed.removed_at !== null) {
+      // Moderators, and whoever can read the audit log that records it.
       const mine = viewer.user !== null && removed.author_id === viewer.user.id;
-      if (mine || viewer.tier >= TIER.staff) return c.json(await singleLink(viewer, removed));
+      const staffView = viewer.permissions.has('moderate') || viewer.permissions.has('readAuditLog');
+      if (mine || staffView) {
+        return c.json(await singleLink(viewer, removed));
+      }
     }
 
     throw notFound('no such link');
@@ -157,8 +162,8 @@ export function linkRoutes(): Hono<AppEnv> {
 
     const draft = await parse(await c.req.json().catch(() => ({})), submitSchema);
 
-    if (draft.isNsfw && user.tier < TIER.full) {
-      throw forbidden('nsfw requires the full tier');
+    if (draft.isNsfw && !viewer.permissions.has('postNsfw')) {
+      throw forbidden('this tier cannot mark posts nsfw');
     }
     if (draft.kind !== 'text' && draft.url.trim() === '') {
       throw invalid('a link needs a url', 'missing_url');
@@ -177,7 +182,7 @@ export function linkRoutes(): Hono<AppEnv> {
       slugs: draft.tagSlugs,
       names: draft.newTagNames,
       authorId: user.id,
-      authorTier: user.tier,
+      approve: viewer.permissions.has('createTags'),
     });
 
     const linkPublicId = publicId('l');
@@ -250,16 +255,26 @@ export function linkRoutes(): Hono<AppEnv> {
     if (row === null) throw notFound('no such link');
 
     const mine = row.author_id === user.id;
-    const asModerator = !mine && canModerateTier(user.tier, row.effective_tier);
+    const asModerator = !mine && mayModerate(viewer, row.effective_tier);
     if (!mine && !asModerator) throw notFound('no such link');
+    // The post is theirs and they can see it, so a 403 confirms nothing new.
+    if (mine && !viewer.permissions.has('editOwn')) {
+      throw forbidden('this tier cannot edit its own posts');
+    }
 
     const patch = await parse(await c.req.json().catch(() => ({})), patchSchema);
 
-    if (patch.isNsfw === true && user.tier < TIER.full) {
-      throw forbidden('nsfw requires the full tier');
+    if (patch.isNsfw === true && !viewer.permissions.has('postNsfw')) {
+      throw forbidden('this tier cannot mark posts nsfw');
     }
 
     const existing = await db.link.findUniqueOrThrow({ where: { id: row.id } });
+
+    // A text post is its body. Emptying it would leave a row the wire shape
+    // cannot represent.
+    if (existing.kind === 'text' && patch.body !== undefined && patch.body.trim() === '') {
+      throw invalid('a text post needs a body', 'missing_body');
+    }
 
     const categoryId =
       patch.categorySlug === undefined
@@ -274,10 +289,25 @@ export function linkRoutes(): Hono<AppEnv> {
             slugs: patch.tagSlugs ?? [],
             names: patch.newTagNames ?? [],
             authorId: user.id,
-            authorTier: user.tier,
+            approve: viewer.permissions.has('createTags'),
           });
 
-    await db.$transaction(async (tx) => {
+    // Pending tags render to the post's author and to staff and above, and to
+    // nobody else (tagsForLinks). An editor outside that set never saw them, so
+    // could not have meant to remove them: they are kept, not silently dropped.
+    const seesPending = mine || viewer.tier >= TIER.staff;
+
+    const tagSlugsOf = async (tx: Pick<typeof db, 'linkTag'>) =>
+      (
+        await tx.linkTag.findMany({
+          where: { linkId: row.id },
+          select: { tag: { select: { slug: true } } },
+        })
+      )
+        .map((entry) => entry.tag.slug)
+        .sort();
+
+    const tagChange = await db.$transaction(async (tx) => {
       // One revision row per edit by anyone, including the author. The public
       // "edited" marker plus this chain is the entire deterrent against
       // rewriting a title after it has collected votes.
@@ -307,15 +337,19 @@ export function linkRoutes(): Hono<AppEnv> {
         },
       });
 
-      if (tagIds !== null) {
-        await tx.linkTag.deleteMany({ where: { linkId: row.id } });
-        if (tagIds.length > 0) {
-          await tx.linkTag.createMany({
-            data: tagIds.map((tagId) => ({ linkId: row.id, tagId })),
-            skipDuplicates: true,
-          });
-        }
+      if (tagIds === null) return null;
+
+      const before = await tagSlugsOf(tx);
+      await tx.linkTag.deleteMany({
+        where: { linkId: row.id, ...(seesPending ? {} : { tag: { status: 'approved' } }) },
+      });
+      if (tagIds.length > 0) {
+        await tx.linkTag.createMany({
+          data: tagIds.map((tagId) => ({ linkId: row.id, tagId })),
+          skipDuplicates: true,
+        });
       }
+      return { before, after: await tagSlugsOf(tx) };
     });
 
     if (asModerator) {
@@ -326,8 +360,20 @@ export function linkRoutes(): Hono<AppEnv> {
         action: 'link.edited_by_moderator',
         subjectType: 'link',
         subjectId: row.public_id,
-        before: { title: existing.title, body: existing.body },
-        after: { title: patch.title ?? existing.title, body: patch.body ?? existing.body },
+        before: {
+          title: existing.title,
+          body: existing.body,
+          categorySlug: row.category_slug,
+          isNsfw: existing.isNsfw,
+          ...(tagChange === null ? {} : { tags: tagChange.before }),
+        },
+        after: {
+          title: patch.title ?? existing.title,
+          body: patch.body ?? existing.body,
+          categorySlug: patch.categorySlug ?? row.category_slug,
+          isNsfw: patch.isNsfw ?? existing.isNsfw,
+          ...(tagChange === null ? {} : { tags: tagChange.after }),
+        },
       });
     }
 
@@ -346,7 +392,7 @@ export function linkRoutes(): Hono<AppEnv> {
     if (row === null) throw notFound('no such link');
 
     const mine = row.author_id === user.id;
-    const asModerator = !mine && canModerateTier(user.tier, row.effective_tier);
+    const asModerator = !mine && mayModerate(viewer, row.effective_tier);
     if (!mine && !asModerator) throw notFound('no such link');
 
     const reasonKey = c.req.query('reason') ?? null;

@@ -1,0 +1,387 @@
+import { useEffect, useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { Settings } from 'lucide-react';
+import { admin, links as linksApi, taxonomy } from '@/api/endpoints';
+import { Button } from '@/components/ui/button';
+import { FieldHint, Input, Label, Select, Textarea } from '@/components/ui/field';
+import { Switch } from '@/components/ui/switch';
+import { TagPicker } from '@/components/TagPicker';
+import type { Category, Link, LinkPatch, Tag } from '@/domain/link';
+import { TIER, type AuthorTierLabel } from '@/domain/tier';
+import { t, tierLabel, tOptional } from '@/i18n/t';
+import type { MessageKey } from '@/i18n/en';
+import { cn } from '@/lib/utils';
+import { useSession } from '@/session/SessionProvider';
+
+/** Reason keys a moderator may attach to a removal. Rendered from the catalogue, never free text. */
+const REMOVAL_REASONS: readonly MessageKey[] = [
+  'sanction.reason.spam',
+  'sanction.reason.abuse',
+  'sanction.reason.nsfw',
+  'sanction.reason.other',
+];
+
+/** Owner is left out: a post pinned there would leave every participating tier. */
+const PIN_TIERS: readonly { tier: number; label: AuthorTierLabel }[] = [
+  { tier: TIER.limited, label: 'limited' },
+  { tier: TIER.full, label: 'full' },
+  { tier: TIER.staff, label: 'staff' },
+  { tier: TIER.admin, label: 'admin' },
+];
+
+const FOLLOW = 'follow';
+
+interface LinkEditDialogProps {
+  link: Link;
+  onChange?: ((next: Link) => void) | undefined;
+  className?: string;
+}
+
+/**
+ * The cog on a post. It renders only when the server says this viewer may do
+ * something to it — `link.viewerCan` — because the client cannot work that out
+ * itself: it never learns the tier an identified author sits at.
+ *
+ * Three independent parts, each shown only when allowed: editing the post,
+ * removing it, and (admins) pinning its tier. Every one is enforced again on the
+ * server, and the moderator paths are audited there.
+ */
+export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProps) {
+  const { allows } = useSession();
+  const can = link.viewerCan;
+
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState(link.title);
+  const [body, setBody] = useState(link.body ?? '');
+  const [categorySlug, setCategorySlug] = useState(link.category.slug);
+  const [isNsfw, setIsNsfw] = useState(link.isNsfw);
+  const [categories, setCategories] = useState<readonly Category[] | null>(null);
+  const [tags, setTags] = useState<readonly Tag[]>([]);
+  const [tagSlugs, setTagSlugs] = useState<readonly string[]>(link.tags.map((tag) => tag.slug));
+  const [newTagNames, setNewTagNames] = useState<readonly string[]>([]);
+  const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [reason, setReason] = useState('');
+  const [pinTo, setPinTo] = useState('');
+  const [pinned, setPinned] = useState(false);
+
+  useEffect(() => {
+    if (!open || !can.edit) return;
+    const controller = new AbortController();
+    taxonomy
+      .categories({ signal: controller.signal })
+      .then(setCategories)
+      .catch(() => setCategories(null));
+    taxonomy
+      .tags({ signal: controller.signal })
+      .then(setTags)
+      .catch(() => setTags([]));
+    return () => controller.abort();
+  }, [open, can.edit]);
+
+  if (!can.edit && !can.remove && !can.retier) return null;
+
+  function reset() {
+    setTitle(link.title);
+    setBody(link.body ?? '');
+    setCategorySlug(link.category.slug);
+    setIsNsfw(link.isNsfw);
+    setTagSlugs(link.tags.map((tag) => tag.slug));
+    setNewTagNames([]);
+    setFailed(false);
+    setConfirmRemove(false);
+    setReason('');
+    setPinTo('');
+    setPinned(false);
+  }
+
+  async function run(action: () => Promise<void>) {
+    if (pending) return;
+    setPending(true);
+    setFailed(false);
+    try {
+      await action();
+    } catch {
+      setFailed(true);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  /** Removal and re-tier answer 204, so read the post back the way this viewer now sees it. */
+  async function reload() {
+    try {
+      onChange?.(await linksApi.get(link.publicId));
+    } catch {
+      /* gone from this viewer's ring; the list will drop it on its next load */
+    }
+  }
+
+  const currentSlugs = link.tags.map((tag) => tag.slug);
+  const tagsChanged =
+    newTagNames.length > 0 ||
+    tagSlugs.length !== currentSlugs.length ||
+    tagSlugs.some((slug) => !currentSlugs.includes(slug));
+
+  const patch: LinkPatch = {
+    ...(title.trim() !== link.title ? { title: title.trim() } : {}),
+    ...(body !== (link.body ?? '') ? { body } : {}),
+    ...(categorySlug !== link.category.slug ? { categorySlug } : {}),
+    ...(isNsfw !== link.isNsfw ? { isNsfw } : {}),
+    // The whole list or nothing: the server replaces the post's tags with it.
+    ...(tagsChanged ? { tagSlugs, newTagNames } : {}),
+  };
+  const changed = Object.keys(patch).length > 0;
+  const valid = title.trim() !== '' && (link.kind !== 'text' || body.trim() !== '');
+
+  const save = () =>
+    run(async () => {
+      if (changed) onChange?.(await linksApi.edit(link.publicId, patch));
+      setOpen(false);
+    });
+
+  const remove = () =>
+    run(async () => {
+      // A reason is only recorded on a moderator removal; on your own post it
+      // would be a notice signed "moderator" for something you did yourself.
+      await linksApi.remove(link.publicId, can.moderate && reason !== '' ? reason : undefined);
+      await reload();
+      setOpen(false);
+    });
+
+  const retier = () =>
+    run(async () => {
+      await admin.retierLink(link.publicId, pinTo === FOLLOW ? null : Number(pinTo));
+      await reload();
+      setPinned(true);
+    });
+
+  const id = (part: string) => `edit-${link.publicId}-${part}`;
+  // The post's own category is always an option, before the list arrives too.
+  const listed = categories ?? [];
+  const categoryOptions = listed.some((c) => c.slug === link.category.slug)
+    ? listed
+    : [link.category, ...listed];
+  // Everything on the post is offered, including a pending tag this viewer
+  // sees here but that `GET /tags` does not list for them.
+  const tagOptions = [
+    ...link.tags.filter((tag) => !tags.some((known) => known.slug === tag.slug)),
+    ...tags,
+  ];
+  // Turning NSFW on needs the permission; turning it off never does.
+  const nsfwLocked = !isNsfw && !allows('postNsfw');
+
+  return (
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (next) reset();
+        setOpen(next);
+      }}
+    >
+      <Dialog.Trigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t('linkEdit.open')}
+          title={t('linkEdit.open')}
+          className={cn('text-muted-foreground', className)}
+        >
+          <Settings />
+        </Button>
+      </Dialog.Trigger>
+
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-popover p-5 text-popover-foreground shadow-lg">
+          <Dialog.Title className="text-base font-semibold">{t('linkEdit.title')}</Dialog.Title>
+          <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+            {can.moderate ? t('linkEdit.moderating') : t('linkEdit.own')}
+          </Dialog.Description>
+
+          {can.edit ? (
+            <form
+              className="mt-4 flex flex-col gap-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (valid) void save();
+              }}
+            >
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={id('title')}>{t('linkEdit.postTitle')}</Label>
+                <Input
+                  id={id('title')}
+                  value={title}
+                  maxLength={300}
+                  required
+                  onChange={(event) => setTitle(event.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={id('body')}>{t('linkEdit.body')}</Label>
+                <Textarea
+                  id={id('body')}
+                  value={body}
+                  maxLength={20_000}
+                  required={link.kind === 'text'}
+                  onChange={(event) => setBody(event.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={id('category')}>{t('linkEdit.category')}</Label>
+                <Select
+                  id={id('category')}
+                  value={categorySlug}
+                  onChange={(event) => setCategorySlug(event.target.value)}
+                >
+                  {categoryOptions.map((category) => (
+                    <option key={category.slug} value={category.slug}>
+                      {tOptional(category.nameKey, category.name)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <TagPicker
+                id={id('tags')}
+                available={tagOptions}
+                slugs={tagSlugs}
+                newNames={newTagNames}
+                onSlugsChange={setTagSlugs}
+                onNewNamesChange={setNewTagNames}
+                creates={allows('createTags')}
+                listClassName="max-h-32 overflow-y-auto"
+              />
+
+              {allows('postNsfw') || link.isNsfw ? (
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id={id('nsfw')}
+                    checked={isNsfw}
+                    disabled={nsfwLocked}
+                    onCheckedChange={setIsNsfw}
+                  />
+                  <Label htmlFor={id('nsfw')}>{t('linkEdit.nsfw')}</Label>
+                </div>
+              ) : null}
+
+              <div className="flex justify-end gap-2">
+                <Dialog.Close asChild>
+                  <Button type="button" variant="ghost" size="sm">
+                    {t('app.cancel')}
+                  </Button>
+                </Dialog.Close>
+                <Button type="submit" size="sm" disabled={pending || !valid || !changed}>
+                  {t('app.save')}
+                </Button>
+              </div>
+            </form>
+          ) : null}
+
+          {can.remove || can.retier ? (
+            <section
+              aria-labelledby={id('moderation')}
+              className={cn('flex flex-col gap-4', can.edit && 'mt-5 border-t border-border pt-4')}
+            >
+              <h3 id={id('moderation')} className={cn('text-sm font-semibold', !can.edit && 'mt-4')}>
+                {t('linkEdit.moderation')}
+              </h3>
+
+              {can.remove ? (
+                <div className="flex flex-col gap-2">
+                  {can.moderate ? (
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor={id('reason')}>{t('linkEdit.removeReason')}</Label>
+                      <Select id={id('reason')} value={reason} onChange={(event) => setReason(event.target.value)}>
+                        <option value="">{t('linkEdit.removeNoReason')}</option>
+                        {REMOVAL_REASONS.map((key) => (
+                          <option key={key} value={key}>
+                            {t(key)}
+                          </option>
+                        ))}
+                      </Select>
+                      <FieldHint>{t('linkEdit.removeReasonHint')}</FieldHint>
+                    </div>
+                  ) : (
+                    <FieldHint>{t('linkEdit.removeOwnHint')}</FieldHint>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {confirmRemove ? (
+                      <>
+                        <Button size="sm" variant="destructive" disabled={pending} onClick={() => void remove()}>
+                          {t('linkEdit.removeConfirm')}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(false)}>
+                          {t('app.cancel')}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => setConfirmRemove(true)}>
+                        {t('linkEdit.remove')}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              {can.retier ? (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={id('pin')}>{t('linkEdit.retier')}</Label>
+                  <div className="flex gap-2">
+                    <Select
+                      id={id('pin')}
+                      value={pinTo}
+                      onChange={(event) => {
+                        setPinTo(event.target.value);
+                        setPinned(false);
+                      }}
+                    >
+                      <option value="" disabled>
+                        {t('linkEdit.retierChoose')}
+                      </option>
+                      {PIN_TIERS.map((option) => (
+                        <option key={option.tier} value={String(option.tier)}>
+                          {tierLabel(option.label)}
+                        </option>
+                      ))}
+                      <option value={FOLLOW}>{t('linkEdit.retierFollow')}</option>
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9"
+                      disabled={pending || pinTo === ''}
+                      onClick={() => void retier()}
+                    >
+                      {t('linkEdit.retierApply')}
+                    </Button>
+                  </div>
+                  <FieldHint>{pinned ? t('linkEdit.retierDone') : t('linkEdit.retierHint')}</FieldHint>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
+          {failed ? (
+            <p role="alert" className="mt-4 text-sm text-destructive">
+              {t('linkEdit.failed')}
+            </p>
+          ) : null}
+
+          {can.edit ? null : (
+            <div className="mt-5 flex justify-end">
+              <Dialog.Close asChild>
+                <Button variant="ghost" size="sm">
+                  {t('app.close')}
+                </Button>
+              </Dialog.Close>
+            </div>
+          )}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
