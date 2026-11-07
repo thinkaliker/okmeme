@@ -4,7 +4,7 @@
   "private": true,
   "description": "A linkdump built around a semi-anonymous tiered community.",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   },
   "scripts": {
     "install:all": "npm install --prefix api && npm install --prefix web",

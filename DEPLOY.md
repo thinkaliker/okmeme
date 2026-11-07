@@ -132,7 +132,7 @@ reversible by anyone who wants to guess an address.
 
 ### Tools on your machine
 
-You need `node` (20 or newer), `npm`, and `git`. For Path A you also need
+You need `node` (22.12 or newer), `npm`, and `git`. For Path A you also need
 `psql` or any way to reach your database — actually no: migrations run through
 `npm run migrate`, which only needs Node and the connection string. Nothing else.
 
@@ -1129,6 +1129,19 @@ submission, so posts made while thumbnails were off need `backfill-thumbs`.
 
 You are on a direct connection string, not a pooled one. Go back to
 [A1](#a1-create-the-database) step 5.
+
+### `self-signed certificate in certificate chain`
+
+The API checks the database's TLS certificate, and your provider signs it with
+its own certificate authority rather than a public one. Supabase is the usual
+case; Neon's certificates are public and pass. `sslmode=require` means "check
+the certificate" here, not just "encrypt", as it did before the Prisma 7 upgrade.
+
+Either download the provider's CA certificate (Supabase: **Settings** →
+**Database** → **SSL Configuration**) and point `NODE_EXTRA_CA_CERTS` at the
+file, or, where you cannot ship a file (Vercel), add `&uselibpqcompat=true` to
+the connection string. The second encrypts without checking who is on the other
+end, which is the weaker of the two.
 
 ### `npm run migrate` fails with `Transaction not found`
 

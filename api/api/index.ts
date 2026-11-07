@@ -1,4 +1,4 @@
-import { handle } from '@hono/node-server/vercel';
+import { getRequestListener } from '@hono/node-server';
 import { createApp } from '../src/app.js';
 
 /**
@@ -9,15 +9,16 @@ import { createApp } from '../src/app.js';
  * Node runtime, not edge: Prisma and argon2 both want it, and the visibility
  * predicate is a Postgres query either way.
  *
- * The adapter has to be `@hono/node-server/vercel`, not `hono/vercel`. A
- * default export on the Node runtime is called with Node's `(req, res)`, and
+ * The handler has to be node-server's `getRequestListener`, not `hono/vercel`.
+ * A default export on the Node runtime is called with Node's `(req, res)`, and
  * `hono/vercel` passes that `req` straight to Hono as if it were a Fetch
  * `Request` — every request then dies on `this.raw.headers.get is not a
- * function`. The node-server adapter converts it, including the body Vercel
- * has already read into `req.rawBody`.
+ * function`. The listener converts it, including the body Vercel has already
+ * read into `req.rawBody`. node-server 1.x wrapped this one call as
+ * `@hono/node-server/vercel`; 2.x dropped that wrapper, not the behavior.
  */
 export const config = { runtime: 'nodejs' };
 
 const app = createApp();
 
-export default handle(app);
+export default getRequestListener(app.fetch);
