@@ -35,7 +35,6 @@ export function hueFor(seed: string): number {
  */
 const DOT = 'oklch(var(--tint-dot-l) var(--tint-dot-c) var(--hue))';
 const EDGE = 'oklch(var(--tint-edge-l) var(--tint-edge-c) var(--hue))';
-const CHIP = 'oklch(var(--tint-chip-l) var(--tint-chip-c) var(--hue))';
 
 function hue(seed: string): CSSProperties {
   return { '--hue': String(hueFor(seed)) } as CSSProperties;
@@ -52,14 +51,4 @@ export function tintEdge(seed: string, side: 'left' | 'top'): CSSProperties {
     ...hue(seed),
     ...(side === 'left' ? { borderLeftColor: EDGE } : { borderTopColor: EDGE }),
   };
-}
-
-/** Small filled square carrying a letter. */
-export function tintChip(seed: string): CSSProperties {
-  return { ...hue(seed), backgroundColor: CHIP, color: 'var(--tint-chip-fg)' };
-}
-
-/** First character of a host, for the small square chip. Falls back to nothing. */
-export function hostInitial(host: string): string {
-  return (host[0] ?? '').toUpperCase();
 }

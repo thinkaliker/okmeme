@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hueFor, tintChip, tintDot, tintEdge } from '@/lib/tint';
+import { hueFor, tintDot, tintEdge } from '@/lib/tint';
 
 describe('tint', () => {
   it('is deterministic and in range', () => {
@@ -29,9 +29,5 @@ describe('tint', () => {
       borderTopColor: 'oklch(var(--tint-edge-l) var(--tint-edge-c) var(--hue))',
     });
     expect(tintEdge('memes', 'left')).not.toHaveProperty('borderTopColor');
-  });
-
-  it('gives the chip a foreground that follows the theme', () => {
-    expect(tintChip('example.org').color).toBe('var(--tint-chip-fg)');
   });
 });

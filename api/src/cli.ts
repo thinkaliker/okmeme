@@ -5,7 +5,7 @@ import { env } from './env.js';
 import { migrate } from './lib/migrate.js';
 import { deriveAtSubmit } from './services/media.js';
 import { bootstrap } from './services/setup.js';
-import { isSetupComplete, thumbnailsEnabled } from './services/settings.js';
+import { isSetupComplete, mediaSwitches } from './services/settings.js';
 import { unfurl } from './services/unfurl.js';
 import { pruneRateLimits } from './ratelimit.js';
 
@@ -100,36 +100,49 @@ async function init(flags: ReadonlySet<string>): Promise<void> {
 }
 
 /**
- * `okmeme backfill-thumbs` — what makes turning thumbnails back on retroactive.
+ * `okmeme backfill-thumbs` — what makes turning thumbnails or favicons back on
+ * retroactive.
  *
- * A thumbnail key is written at submission, so posts made while thumbnails were
- * off carry a null one and would stay blank forever. This walks those posts and
- * derives what it can. Everything else about it is already true elsewhere: the
- * fetch is server-side, keys are derived rather than random, and a link whose
- * target has no preview image is an ordinary link rather than a failure.
+ * A key is written at submission, so posts made while a switch was off carry a
+ * null one and would stay blank forever. This walks those posts and derives
+ * what it can, for whichever of the two is on. Everything else about it is
+ * already true elsewhere: the fetch is server-side, keys are derived rather
+ * than random, and a link whose target has no preview image is an ordinary
+ * link rather than a failure.
+ *
+ * It only ever fills a null key. A key that is already there is never
+ * overwritten, so running it with favicons off leaves every stored favicon key
+ * in place for the day they are turned on.
  *
  * Sequential and interruptible on purpose. It is talking to a few hundred other
  * people's servers, and it is safe to run again — the query only ever picks up
  * what is still missing.
  */
 async function backfillThumbs(max: number): Promise<void> {
-  if (!(await thumbnailsEnabled())) {
+  const enabled = await mediaSwitches();
+  if (!enabled.thumbnails && !enabled.favicons) {
     console.error(
-      'Thumbnails are off on this instance. Turn them on first:\n' +
-        '  BLOB_STORE must not be "none", and settings.thumbnails_enabled must be true.',
+      'Thumbnails and favicons are both off on this instance. Turn one on first:\n' +
+        '  BLOB_STORE must not be "none", and settings.thumbnails_enabled or\n' +
+        '  settings.favicons_enabled must be true.',
     );
     process.exitCode = 1;
     return;
   }
 
+  const missing = [
+    ...(enabled.thumbnails ? [{ thumbKey: null }] : []),
+    ...(enabled.favicons ? [{ faviconKey: null }] : []),
+  ];
+
   const links = await db.link.findMany({
-    where: { removedAt: null, thumbKey: null, url: { not: null } },
+    where: { removedAt: null, url: { not: null }, OR: missing },
     orderBy: { createdAt: 'desc' },
-    select: { publicId: true, url: true, host: true },
+    select: { publicId: true, url: true, host: true, thumbKey: true, faviconKey: true },
     take: max,
   });
 
-  console.log(`${links.length} link(s) with no thumbnail. Fetching.`);
+  console.log(`${links.length} link(s) missing an image. Fetching.`);
 
   let derived = 0;
   for (const link of links) {
@@ -138,15 +151,18 @@ async function backfillThumbs(max: number): Promise<void> {
       const meta = await unfurl(link.url);
       const keys = await deriveAtSubmit(
         link.publicId,
-        meta.imageUrl,
-        meta.faviconUrl,
+        link.thumbKey === null ? meta.imageUrl : null,
+        link.faviconKey === null ? meta.faviconUrl : null,
         link.host ?? '',
       );
-      if (keys.thumbKey === null && keys.faviconKey === null) continue;
-      await db.link.update({
-        where: { publicId: link.publicId },
-        data: { thumbKey: keys.thumbKey, faviconKey: keys.faviconKey },
-      });
+      const data = {
+        ...(link.thumbKey === null && keys.thumbKey !== null ? { thumbKey: keys.thumbKey } : {}),
+        ...(link.faviconKey === null && keys.faviconKey !== null
+          ? { faviconKey: keys.faviconKey }
+          : {}),
+      };
+      if (Object.keys(data).length === 0) continue;
+      await db.link.update({ where: { publicId: link.publicId }, data });
       derived += 1;
       console.log(`  ${link.publicId}`);
     } catch {
@@ -189,7 +205,7 @@ switch (command) {
       'usage: okmeme <command>\n\n' +
         '  init [--no-thumbnails]        create the owner and the admin\n' +
         '  migrate                       apply pending migrations\n' +
-        '  backfill-thumbs [--limit N]   derive thumbnails for posts that have none\n' +
+        '  backfill-thumbs [--limit N]   derive thumbnails and favicons for posts that have none\n' +
         '  prune-rate-limits             drop expired rate limit buckets\n',
     );
     process.exitCode = 1;

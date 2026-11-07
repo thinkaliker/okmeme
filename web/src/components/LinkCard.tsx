@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import type { Link, MediaType } from '@/domain/link';
 import { t, tOptional } from '@/i18n/t';
-import { hostInitial, tintChip, tintEdge } from '@/lib/tint';
+import { tintEdge } from '@/lib/tint';
 import { absoluteTime, cn, relativeTime } from '@/lib/utils';
 import { useSession } from '@/session/SessionProvider';
 
@@ -51,43 +51,37 @@ function KindIcon({ link }: { link: Link }) {
 }
 
 /**
- * The site's icon when it has one, a tinted letter square when it does not.
+ * The site's icon when the server sent one, and nothing at all when it did not.
  *
- * Decorative either way — the host is spelled out next to the title — so it is
- * hidden from assistive tech rather than given an alt text that repeats it.
+ * Favicons are an instance setting (`favicons_enabled`), off by default, and
+ * with it off every `faviconKey` arrives null. There is deliberately no
+ * stand-in: a letter square in a monospace face read as a number — an "O" for
+ * a host starting with o looked like a score of 0 next to the title.
+ *
+ * Decorative — the host is spelled out next to the title — so it is hidden from
+ * assistive tech rather than given an alt text that repeats it.
  *
  * The image is `faviconUrl(key)`, which resolves to okmeme's own origin. It is
  * never `https://<host>/favicon.ico`: that would make every feed render a
  * request to the target site, and a site that can count its referrers can count
  * the readers of a tier it cannot see.
  */
-function HostChip({ host, faviconKey }: { host: string; faviconKey: string | null }) {
+function Favicon({ faviconKey }: { faviconKey: string | null }) {
   const src = faviconUrl(faviconKey);
-
-  if (src !== null) {
-    return (
-      <img
-        src={src}
-        alt=""
-        aria-hidden="true"
-        width={16}
-        height={16}
-        loading="lazy"
-        decoding="async"
-        referrerPolicy="no-referrer"
-        className="size-4 shrink-0 rounded-[3px] object-cover"
-      />
-    );
-  }
+  if (src === null) return null;
 
   return (
-    <span
+    <img
+      src={src}
+      alt=""
       aria-hidden="true"
-      className="flex size-4 shrink-0 items-center justify-center rounded-[3px] font-mono text-[9px] font-bold"
-      style={tintChip(host)}
-    >
-      {hostInitial(host)}
-    </span>
+      width={16}
+      height={16}
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      className="size-4 shrink-0 rounded-[3px] object-cover"
+    />
   );
 }
 
@@ -183,7 +177,7 @@ export function LinkCard({ link, onChange, headingLevel = 2, expanded = false }:
                 <KindIcon link={link} />
               </span>
             )}
-            {host === null ? null : <HostChip host={host} faviconKey={faviconKey} />}
+            <Favicon faviconKey={faviconKey} />
           </span>
 
           <Heading className="min-w-0 flex-1 self-center text-[0.9375rem] font-bold leading-snug break-words compact:text-sm">

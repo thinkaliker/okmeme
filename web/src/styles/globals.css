@@ -46,9 +46,6 @@
   --tint-dot-c: 0.11;
   --tint-edge-l: 58%;
   --tint-edge-c: 0.11;
-  --tint-chip-l: 62%;
-  --tint-chip-c: 0.09;
-  --tint-chip-fg: oklch(0.99 0 0);
 }
 
 .dark {
@@ -80,9 +77,6 @@
   --tint-dot-c: 0.12;
   --tint-edge-l: 64%;
   --tint-edge-c: 0.13;
-  --tint-chip-l: 62%;
-  --tint-chip-c: 0.11;
-  --tint-chip-fg: oklch(0.16 0.01 285);
 }
 
 @theme inline {

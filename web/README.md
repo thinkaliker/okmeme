@@ -69,8 +69,10 @@ its colour across a rename and nobody maintains a palette by hand. Only the hue
 varies — lightness and chroma are theme variables, so one seed reads correctly
 in light and dark.
 
-Beside the kind icon sits the site's favicon, or — when the site has none — a
-letter square tinted by the host. The favicon comes from okmeme's own origin
+Beside the kind icon sits the site's favicon when the API sends one, and
+nothing when it does not — favicons are an instance setting, off by default,
+and there is deliberately no letter stand-in (a monospace "O" read as a score
+of 0). The favicon comes from okmeme's own origin
 through the same key-based route as thumbnails, never from
 `https://<host>/favicon.ico`: a 16px image is more than enough to log a viewer,
 and a site that can count its referrers can count the readers of a tier it

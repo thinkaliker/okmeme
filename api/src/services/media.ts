@@ -2,7 +2,7 @@ import { db } from '../db.js';
 import { blobStore } from '../ports/blob/index.js';
 import type { Blob } from '../ports/blob/index.js';
 import { safeFetch } from './fetcher.js';
-import { thumbnailsEnabled } from './settings.js';
+import { mediaSwitches } from './settings.js';
 import { unfurl } from './unfurl.js';
 
 /**
@@ -83,14 +83,15 @@ export async function deriveAtSubmit(
   // The gate lives here as well as at the call site. The call site skips the
   // unfurl to save the outbound request; this one is what makes "off" true of
   // every path into the store rather than of the one that was remembered.
-  if (!(await thumbnailsEnabled())) return { thumbKey, faviconKey };
+  // Thumbnails and favicons are switched separately, so each is gated alone.
+  const enabled = await mediaSwitches();
 
-  if (imageUrl !== null) {
+  if (enabled.thumbnails && imageUrl !== null) {
     const key = thumbKeyFor(linkPublicId);
     if ((await storeFromUrl(key, imageUrl, THUMB_WIDTH)) !== null) thumbKey = key;
   }
 
-  if (faviconUrl !== null && host !== '') {
+  if (enabled.favicons && faviconUrl !== null && host !== '') {
     const key = faviconKeyFor(host);
     const existing = await blobStore().get(key);
     if (existing !== null) faviconKey = key;
@@ -137,14 +138,16 @@ export async function regenerate(key: string): Promise<Blob | null> {
 }
 
 /**
- * With thumbnails off this returns null for every key, and `/thumb/:key` 404s
- * exactly as it does for a key that never existed. That the instance is not
- * serving images is a property of the instance, not of the viewer's tier, so
- * one response for both cases costs nothing and keeps the route down to a
- * single observable behaviour.
+ * With thumbnails off this returns null for every thumbnail key, and with
+ * favicons off for every favicon key, so `/thumb/:key` 404s exactly as it does
+ * for a key that never existed. That the instance is not serving images is a
+ * property of the instance, not of the viewer's tier, so one response for both
+ * cases costs nothing and keeps the route down to a single observable
+ * behaviour.
  */
 export async function readOrRegenerate(key: string): Promise<Blob | null> {
-  if (!(await thumbnailsEnabled())) return null;
+  const enabled = await mediaSwitches();
+  if (!(key.startsWith('fav_') ? enabled.favicons : enabled.thumbnails)) return null;
   const hit = await blobStore().get(key);
   if (hit !== null) return hit;
   return regenerate(key);

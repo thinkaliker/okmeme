@@ -2,6 +2,7 @@ import type { Viewer, ActiveSanction, ViewerUser } from './context.js';
 import { CAPABILITIES, canAdjustOwnTier, mayModerate, type Capability } from './permissions.js';
 import { isIdentified, tierLabel } from './tier.js';
 import { standingTier, type LinkRow, type TagRow } from './visibility.js';
+import type { MediaSwitches } from './services/settings.js';
 
 /**
  * The wire shape. One rule dominates everything below:
@@ -106,10 +107,16 @@ export function viewerCan(viewer: Viewer, row: LinkRow): ViewerCanPayload {
   };
 }
 
+/**
+ * `media` is the instance's two image switches. A key for a kind that is
+ * switched off goes out as null, so a client never holds a key that would 404
+ * and never has a reason to resolve one anywhere else.
+ */
 export function linkPayload(
   viewer: Viewer,
   row: LinkRow,
   tags: readonly TagRow[],
+  media: MediaSwitches,
 ): Record<string, unknown> {
   const removed =
     row.removed_at === null
@@ -149,6 +156,8 @@ export function linkPayload(
 
   // A removed post keeps its notice and loses its body.
   const body = removed === null ? row.body : '';
+  const thumbKey = removed === null && media.thumbnails ? row.thumb_key : null;
+  const faviconKey = removed === null && media.favicons ? row.favicon_key : null;
 
   switch (row.kind) {
     case 'text':
@@ -160,8 +169,8 @@ export function linkPayload(
         url: row.url ?? '',
         host: row.host ?? '',
         mediaType: row.media_type ?? 'image',
-        thumbKey: removed === null ? row.thumb_key : null,
-        faviconKey: removed === null ? row.favicon_key : null,
+        thumbKey,
+        faviconKey,
         body,
       };
     default:
@@ -170,8 +179,8 @@ export function linkPayload(
         kind: 'link',
         url: row.url ?? '',
         host: row.host ?? '',
-        thumbKey: removed === null ? row.thumb_key : null,
-        faviconKey: removed === null ? row.favicon_key : null,
+        thumbKey,
+        faviconKey,
         body,
       };
   }

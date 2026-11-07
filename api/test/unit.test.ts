@@ -350,6 +350,135 @@ describe('the thumbnails migration', () => {
   });
 });
 
+describe('favicons, off unless switched on', () => {
+  /**
+   * The settings rows the switches read, without a database. A store is
+   * configured (the test default is local-fs), so these exercise the setting
+   * itself rather than the BLOB_STORE short-circuit.
+   */
+  async function withSettings<T>(
+    rows: readonly { key: string; value: unknown }[],
+    run: () => Promise<T>,
+  ): Promise<T> {
+    const { db } = await import('../src/db.js');
+    const { vi } = await import('vitest');
+    const spy = vi.spyOn(db.setting, 'findMany').mockResolvedValue(rows as never);
+    return run().finally(() => spy.mockRestore());
+  }
+
+  it('is off on an instance that never wrote the setting', async () => {
+    const { faviconsEnabled, mediaSwitches } = await import('../src/services/settings.js');
+    await withSettings([], async () => {
+      expect(await faviconsEnabled()).toBe(false);
+      // Thumbnails keep their old default, and the two are independent.
+      expect(await mediaSwitches()).toEqual({ thumbnails: true, favicons: false });
+    });
+  });
+
+  it('is on only for a real true, and only with somewhere to put the bytes', async () => {
+    const { faviconsEnabled } = await import('../src/services/settings.js');
+    await withSettings([{ key: 'favicons_enabled', value: 'true' }], async () => {
+      expect(await faviconsEnabled()).toBe(false);
+    });
+    await withSettings([{ key: 'favicons_enabled', value: true }], async () => {
+      expect(await faviconsEnabled()).toBe(true);
+    });
+
+    process.env['BLOB_STORE'] = 'none';
+    resetEnv();
+    try {
+      expect(await faviconsEnabled()).toBe(false);
+    } finally {
+      delete process.env['BLOB_STORE'];
+      resetEnv();
+    }
+  });
+
+  it('fetches no icon and serves none while off, with thumbnails still on', async () => {
+    const { vi } = await import('vitest');
+    resetBlobStore();
+    const get = vi.spyOn(blobStore(), 'get');
+    try {
+      await withSettings([{ key: 'thumbnails_enabled', value: true }], async () => {
+        const derived = await deriveAtSubmit(
+          'l_1',
+          null,
+          'https://example.org/favicon.ico',
+          'example.org',
+        );
+        expect(derived).toEqual({ thumbKey: null, faviconKey: null });
+        expect(await readOrRegenerate('fav_example.org')).toBeNull();
+        // Not even a look in the store: off is decided before any lookup.
+        expect(get).not.toHaveBeenCalled();
+      });
+    } finally {
+      get.mockRestore();
+      resetBlobStore();
+    }
+  });
+
+  it('sends no favicon key while off, and the stored one again once on', async () => {
+    const { linkPayload } = await import('../src/serialize.js');
+    const { effectivePermissions } = await import('../src/permissions.js');
+    const viewer = {
+      tier: TIER.anonymous,
+      user: null,
+      permissions: effectivePermissions(TIER.anonymous, new Map()),
+    } as never;
+    const row = {
+      id: 1n,
+      public_id: 'l_1',
+      kind: 'link',
+      url: 'https://example.org/post',
+      media_type: null,
+      title: 'a post',
+      body: null,
+      host: 'example.org',
+      thumb_key: 'th_l_1',
+      favicon_key: 'fav_example.org',
+      is_nsfw: false,
+      created_at: new Date(0),
+      edited_at: null,
+      removed_at: null,
+      removed_reason: null,
+      effective_tier: TIER.limited,
+      attribution_tier: TIER.limited,
+      pinned_tier: null,
+      author_id: 2n,
+      author_public_id: 'u_1',
+      author_username: 'dana',
+      category_slug: 'tech',
+      category_name: 'Tech',
+      score: 1,
+      viewer_vote: 0,
+      bookmarked: false,
+      rank: 0n,
+    } as never;
+
+    expect(linkPayload(viewer, row, [], { thumbnails: true, favicons: false })).toMatchObject({
+      thumbKey: 'th_l_1',
+      faviconKey: null,
+    });
+    expect(linkPayload(viewer, row, [], { thumbnails: false, favicons: true })).toMatchObject({
+      thumbKey: null,
+      faviconKey: 'fav_example.org',
+    });
+  });
+});
+
+describe('the favicons migration', () => {
+  it('is one statement, off, that cannot flip an instance which already chose', () => {
+    const sql = readFileSync(
+      new URL('../migrations/0006_favicons_setting.sql', import.meta.url),
+      'utf8',
+    );
+    const statements = splitStatements(sql);
+    expect(statements).toHaveLength(1);
+    expect(statements[0]).toContain("('favicons_enabled', 'false'::jsonb, 4)");
+    expect(statements[0]).toContain('ON CONFLICT (key) DO NOTHING');
+  });
+});
+
 describe('permissions before the migration has run', () => {
   it('falls back to the defaults when the table does not exist, and only then', async () => {
     const { Prisma } = await import('@prisma/client');

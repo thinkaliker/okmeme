@@ -164,10 +164,11 @@ describe('LinkCard', () => {
     expect(icon?.getAttribute('alt')).toBe('');
   });
 
-  it('falls back to a letter square when the site has no icon', () => {
+  it('draws nothing beside the kind icon when there is no favicon', () => {
+    // No stand-in: a letter square read as a number next to the title.
     const { container } = renderCard(aboveTierLink);
     expect(container.querySelector('img')).toBeNull();
-    expect(screen.getByText('E')).toBeDefined();
+    expect(screen.queryByText('E')).toBeNull();
   });
 
   it('keeps the icons out of the heading so a long title cannot wrap under them', () => {

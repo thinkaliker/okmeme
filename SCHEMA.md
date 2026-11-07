@@ -151,7 +151,9 @@ append-only, enforced at the database role level rather than in application code
 
 `setup_complete` is written once by whichever bootstrap path ran first and is never unset. both `/setup` and `okmeme init` check it and refuse; the web route 404s once it is true, so a leaked `SETUP_TOKEN` on a live instance is inert.
 
-`thumbnails_enabled` switches media derivation off for an instance with nowhere to keep bytes. it is admin-writable and cosmetic: with it false nothing is fetched, nothing is stored, `/thumb/:key` 404s, and links render with the tinted host letter. `BLOB_STORE=none` forces it false regardless, so an admin cannot enable a feature the deployment cannot serve. it never causes a fallback to the source host — see [VISIBILITY.md](VISIBILITY.md).
+`thumbnails_enabled` switches thumbnail derivation off for an instance with nowhere to keep bytes. it is admin-writable and cosmetic: with it false no preview image is fetched or stored, `thumb_key` goes out null, and `/thumb/th_*` 404s. `BLOB_STORE=none` forces it false regardless, so an admin cannot enable a feature the deployment cannot serve. it never causes a fallback to the source host — see [VISIBILITY.md](VISIBILITY.md).
+
+`favicons_enabled` is the same switch for site icons, independent of `thumbnails_enabled`, and **off by default** — a missing row or any value but `true` means off. with it off no favicon is fetched at submission, `favicon_key` goes out null, and `/thumb/fav_*` 404s. keys already in `links.favicon_key` are kept, so turning it on restores them with no backfill. `BLOB_STORE=none` forces it false too.
 
 **tier_permissions** — `tier` smallint (1–4), `capability` text, `granted` boolean, `updated_by`, `updated_at`, pk `(tier, capability)`.
 

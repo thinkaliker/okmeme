@@ -68,8 +68,8 @@ export const inviteMinTier = (): Promise<number> => getSetting('invite_min_tier'
 export const inviteTtlDays = (): Promise<number> => getSetting('invite_ttl_days', 14);
 
 /**
- * Thumbnails and favicons, off or on. Two switches, because they answer two
- * different questions:
+ * Thumbnails, off or on. Two switches, because they answer two different
+ * questions:
  *
  * - `BLOB_STORE=none` says there is nowhere to put bytes. Deployment shape.
  * - `thumbnails_enabled` says an instance with somewhere to put them would
@@ -82,6 +82,43 @@ export const inviteTtlDays = (): Promise<number> => getSetting('invite_ttl_days'
  * submission.
  */
 export async function thumbnailsEnabled(): Promise<boolean> {
-  if (env().blobStore === 'none') return false;
-  return getSetting('thumbnails_enabled', true);
+  return (await mediaSwitches()).thumbnails;
+}
+
+/**
+ * Favicons, off or on — the same two halves as thumbnails, and independent of
+ * them, but **off by default**: a missing row means off, and so does anything
+ * stored there other than `true`.
+ *
+ * Turning it off hides keys that were already written rather than deleting
+ * them, so turning it back on restores those posts with no backfill.
+ */
+export async function faviconsEnabled(): Promise<boolean> {
+  return (await mediaSwitches()).favicons;
+}
+
+export interface MediaSwitches {
+  readonly thumbnails: boolean;
+  readonly favicons: boolean;
+}
+
+/**
+ * Both switches in one read, and the only place either is decided. Submission,
+ * `/thumb/:key` and the serializer all ask here, so the fetch, the route and
+ * the payload cannot disagree about whether a picture exists.
+ */
+export async function mediaSwitches(): Promise<MediaSwitches> {
+  if (env().blobStore === 'none') return { thumbnails: false, favicons: false };
+  const rows = await db.setting.findMany({
+    where: { key: { in: ['thumbnails_enabled', 'favicons_enabled'] } },
+    select: { key: true, value: true },
+  });
+  const stored = (key: string): unknown => rows.find((row) => row.key === key)?.value;
+  const thumbnails = stored('thumbnails_enabled');
+  return {
+    // Defaults on, and truthy as it always has been.
+    thumbnails: thumbnails === undefined ? true : Boolean(thumbnails),
+    // Defaults off, and only a real `true` turns it on.
+    favicons: stored('favicons_enabled') === true,
+  };
 }
