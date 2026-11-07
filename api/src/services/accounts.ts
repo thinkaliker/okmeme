@@ -47,6 +47,8 @@ export async function createAccount(input: {
   password: string;
   tier: number;
   invitedBy?: bigint | null;
+  /** The invite spent at signup. Setup and `okmeme init` pass none. */
+  inviteId?: bigint | null;
 }): Promise<CreatedAccount> {
   const username = input.username.trim();
   if (!isValidUsername(username)) {
@@ -68,6 +70,7 @@ export async function createAccount(input: {
       tier: input.tier,
       showNsfw: false,
       invitedBy: input.invitedBy ?? null,
+      inviteId: input.inviteId ?? null,
       identities: {
         create: {
           provider: authProvider().name,

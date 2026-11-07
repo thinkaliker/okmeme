@@ -110,11 +110,15 @@ model User {
   theme     String    @default("system")
   display   Json      @default("{}")
   invitedBy BigInt?   @map("invited_by")
+  /// The invite this account spent at signup. Null for the two accounts setup
+  /// creates, and for accounts made before invites recorded it.
+  inviteId  BigInt?   @map("invite_id")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   inviter          User?             @relation("Invited", fields: [invitedBy], references: [id])
   invitees         User[]            @relation("Invited")
+  invite           Invite?           @relation("InviteRedemption", fields: [inviteId], references: [id])
   identities       Identity[]
   sessions         Session[]
   apiTokens        ApiToken[]
@@ -203,11 +207,22 @@ model Invite {
   codeHash   String    @unique @map("code_hash")
   issuedBy   BigInt    @map("issued_by")
   issuedAt   DateTime  @default(now()) @map("issued_at") @db.Timestamptz(6)
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  /// Null means the invite never expires.
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
+  /// Null means unlimited. 1 is the default, and what every invite issued
+  /// before 0003_invite_options.sql became.
+  maxUses    Int?      @default(1) @map("max_uses")
+  /// Claimed atomically at signup. Internal; the API never emits it.
+  uses       Int       @default(0)
+  /// Legacy, from when invites were single-use. Backfilled into
+  /// `users.invite_id` and no longer read or written.
   consumedBy BigInt?   @map("consumed_by")
+  /// Legacy. See `consumedBy`.
   consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
   revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
   note       String?
+
+  redeemers User[] @relation("InviteRedemption")
 
   @@map("invites")
 }

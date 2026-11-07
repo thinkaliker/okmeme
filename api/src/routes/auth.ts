@@ -14,6 +14,7 @@ import { mePayload } from '../serialize.js';
 import {
   createAccount,
   createSession,
+  type CreatedAccount,
   revokeAllCredentials,
   revokeSession,
 } from '../services/accounts.js';
@@ -85,30 +86,40 @@ export function authRoutes(): Hono<AppEnv> {
       throw new ApiError(403, 'signup_closed', 'signup is closed on this instance');
     }
 
+    // One answer for wrong, used up, revoked and expired. Distinguishing them
+    // would tell a stranger which codes had ever existed.
+    const unusable = () => invalid('that invite is not usable', 'bad_invite');
+
     const invite = await db.invite.findUnique({ where: { codeHash: hashToken(body.data.invite) } });
-    const now = new Date();
-    if (
-      invite === null ||
-      invite.consumedAt !== null ||
-      invite.revokedAt !== null ||
-      invite.expiresAt < now
-    ) {
-      // One answer for wrong, spent, revoked and expired. Distinguishing them
-      // would tell a stranger which codes had ever existed.
-      throw invalid('that invite is not usable', 'bad_invite');
+    if (invite === null) throw unusable();
+
+    // Claim a use before creating anything. The check and the increment are one
+    // statement, so two people racing for the last use of a code cannot both
+    // get in — which a read followed by a write would allow.
+    const claimed = await db.$executeRaw`
+      UPDATE invites SET uses = uses + 1
+       WHERE id = ${invite.id}
+         AND revoked_at IS NULL
+         AND (expires_at IS NULL OR expires_at > now())
+         AND (max_uses IS NULL OR uses < max_uses)
+    `;
+    if (claimed === 0) throw unusable();
+
+    let account: CreatedAccount;
+    try {
+      account = await createAccount({
+        username: body.data.username,
+        password: body.data.password,
+        tier: TIER.limited,
+        invitedBy: invite.issuedBy,
+        inviteId: invite.id,
+      });
+    } catch (cause) {
+      // A taken username or a short password must not cost the invite a use.
+      await db.$executeRaw`UPDATE invites SET uses = uses - 1 WHERE id = ${invite.id} AND uses > 0`;
+      throw cause;
     }
 
-    const account = await createAccount({
-      username: body.data.username,
-      password: body.data.password,
-      tier: TIER.limited,
-      invitedBy: invite.issuedBy,
-    });
-
-    await db.invite.update({
-      where: { id: invite.id },
-      data: { consumedBy: account.userId, consumedAt: now },
-    });
     await audit({
       actorId: account.userId,
       action: 'invite.consumed',

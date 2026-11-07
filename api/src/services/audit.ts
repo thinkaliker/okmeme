@@ -26,6 +26,7 @@ export type AuditAction =
   | 'category.renamed'
   | 'category.deleted'
   | 'invite.issued'
+  | 'invite.edited'
   | 'invite.revoked'
   | 'invite.consumed'
   | 'report.resolved'

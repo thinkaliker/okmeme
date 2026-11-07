@@ -7,8 +7,8 @@ import { TIER } from '../src/tier.js';
 
 /**
  * The admin panel's write paths that guard an invariant: the owner set can only
- * change through /owner, and a category cannot be deleted out from under the
- * links that reference it.
+ * change through /owner, a category cannot be deleted out from under the links
+ * that reference it, and an invite never admits more people than its limit.
  */
 const enabled = process.env['TEST_DATABASE_URL'] !== undefined;
 
@@ -180,6 +180,174 @@ describe.skipIf(!enabled)('admin writes', () => {
       expect((await call('admin', 'DELETE', '/categories/empty')).status).toBe(204);
       expect(await slugs()).toEqual(['videos']);
       expect((await call('admin', 'DELETE', '/categories/empty')).status).toBe(404);
+    });
+  });
+
+  /* ------------------------------------------------------------ invites */
+
+  describe('invites', () => {
+    let nextName = 0;
+    const freshName = () => `newbie${(nextName += 1)}`;
+
+    const signup = (invite: string, username = freshName()) =>
+      app.request('/auth/signup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username, password: 'correct horse battery', invite }),
+      });
+
+    const issue = async (body: Record<string, unknown> = {}) => {
+      const response = await call('admin', 'POST', '/admin/invites', body);
+      expect(response.status).toBe(201);
+      return (await response.json()) as { id: string; code: string; expiresAt: string | null; maxUses: number | null };
+    };
+
+    type Listed = {
+      id: string;
+      maxUses: number | null;
+      expiresAt: string | null;
+      exhausted: boolean;
+      revokedAt: string | null;
+      redeemedBy: { publicId: string; username: string | null; joinedAt: string }[];
+    };
+    const listed = async (id: string): Promise<Listed> => {
+      const response = await call('admin', 'GET', '/admin/invites?limit=50');
+      expect(response.status).toBe(200);
+      const page = (await response.json()) as { items: Listed[] };
+      const found = page.items.find((item) => item.id === id);
+      if (found === undefined) throw new Error(`invite ${id} not listed`);
+      return found;
+    };
+
+    it('defaults to one use and the instance expiry', async () => {
+      const invite = await issue({ note: 'plain' });
+      expect(invite.maxUses).toBe(1);
+      expect(invite.expiresAt).not.toBeNull();
+      const days = (new Date(invite.expiresAt!).getTime() - Date.now()) / 86_400_000;
+      expect(days).toBeGreaterThan(13.9);
+      expect(days).toBeLessThan(14.1);
+
+      expect((await signup(invite.code)).status).toBe(201);
+      const second = await signup(invite.code);
+      expect(second.status).toBe(400);
+      expect(await second.json()).toMatchObject({ code: 'bad_invite' });
+    });
+
+    it('admits up to its limit, then lists everyone who used it', async () => {
+      const invite = await issue({ maxUses: 2 });
+      expect((await signup(invite.code, 'first_in')).status).toBe(201);
+      expect((await listed(invite.id)).exhausted).toBe(false);
+      expect((await signup(invite.code, 'second_in')).status).toBe(201);
+      expect((await signup(invite.code)).status).toBe(400);
+
+      const row = await listed(invite.id);
+      expect(row.exhausted).toBe(true);
+      expect(row.redeemedBy.map((user) => user.username)).toEqual(['first_in', 'second_in']);
+      // A flag and a list, never a number of anything.
+      expect(row).not.toHaveProperty('uses');
+      expect(row).not.toHaveProperty('count');
+
+      const user = await db.user.findFirstOrThrow({ where: { username: 'first_in' } });
+      expect(user.inviteId).toBe(BigInt(invite.id));
+      expect(user.invitedBy).toBe(who('admin').id);
+    });
+
+    it('can be unlimited and never expire', async () => {
+      const invite = await issue({ maxUses: null, ttlDays: null });
+      expect(invite).toMatchObject({ maxUses: null, expiresAt: null });
+      for (let index = 0; index < 3; index += 1) expect((await signup(invite.code)).status).toBe(201);
+      const row = await listed(invite.id);
+      expect(row).toMatchObject({ maxUses: null, expiresAt: null, exhausted: false });
+      expect(row.redeemedBy).toHaveLength(3);
+    });
+
+    it('refuses a malformed issuance instead of falling back to defaults', async () => {
+      expect((await call('admin', 'POST', '/admin/invites', { maxUses: 0 })).status).toBe(400);
+      expect((await call('admin', 'POST', '/admin/invites', { ttlDays: 'soon' })).status).toBe(400);
+      expect((await call('member', 'POST', '/admin/invites', {})).status).toBe(403);
+    });
+
+    it('gives the use back when signup fails for another reason', async () => {
+      const invite = await issue();
+      const taken = await signup(invite.code, 'first_in');
+      expect(taken.status).toBe(409);
+      expect((await signup(invite.code)).status).toBe(201);
+    });
+
+    it('lets exactly one of two simultaneous signups spend a single-use code', async () => {
+      const invite = await issue();
+      const results = await Promise.all([signup(invite.code), signup(invite.code)]);
+      expect(results.map((response) => response.status).sort()).toEqual([201, 400]);
+      expect((await listed(invite.id)).redeemedBy).toHaveLength(1);
+    });
+
+    it('edits the limit, the expiry, and the note, and audits what changed', async () => {
+      const invite = await issue({ note: 'before' });
+      expect((await signup(invite.code)).status).toBe(201);
+      expect((await listed(invite.id)).exhausted).toBe(true);
+
+      // Raising the limit reopens a used-up invite.
+      const later = new Date(Date.now() + 30 * 86_400_000).toISOString();
+      const edited = await call('admin', 'PATCH', `/admin/invites/${invite.id}`, {
+        note: 'after',
+        maxUses: 3,
+        expiresAt: later,
+      });
+      expect(edited.status).toBe(204);
+      const row = await listed(invite.id);
+      expect(row).toMatchObject({ maxUses: 3, expiresAt: later, exhausted: false });
+      expect((await signup(invite.code)).status).toBe(201);
+
+      const logged = await db.auditLog.findFirstOrThrow({
+        where: { action: 'invite.edited', subjectId: invite.id },
+      });
+      expect(logged.before).toMatchObject({ note: 'before', maxUses: 1 });
+      expect(logged.after).toMatchObject({ note: 'after', maxUses: 3, expiresAt: later });
+
+      // Never expiring, and back to unlimited.
+      expect((await call('admin', 'PATCH', `/admin/invites/${invite.id}`, { expiresAt: null, maxUses: null })).status).toBe(204);
+      expect(await listed(invite.id)).toMatchObject({ maxUses: null, expiresAt: null });
+    });
+
+    it('refuses an edit that would undercount, end in the past, or come from a non-admin', async () => {
+      const invite = await issue({ maxUses: 3 });
+      expect((await signup(invite.code)).status).toBe(201);
+      expect((await signup(invite.code)).status).toBe(201);
+
+      const below = await call('admin', 'PATCH', `/admin/invites/${invite.id}`, { maxUses: 1 });
+      expect(below.status).toBe(409);
+      expect(await below.json()).toMatchObject({ code: 'below_uses' });
+      // Equal to what has been spent is allowed: it closes the invite.
+      expect((await call('admin', 'PATCH', `/admin/invites/${invite.id}`, { maxUses: 2 })).status).toBe(204);
+      expect((await listed(invite.id)).exhausted).toBe(true);
+
+      const past = new Date(Date.now() - 60_000).toISOString();
+      const ended = await call('admin', 'PATCH', `/admin/invites/${invite.id}`, { expiresAt: past });
+      expect(ended.status).toBe(400);
+      expect(await ended.json()).toMatchObject({ code: 'expiry_in_past' });
+
+      expect((await call('admin', 'PATCH', `/admin/invites/${invite.id}`, {})).status).toBe(400);
+      expect((await call('member', 'PATCH', `/admin/invites/${invite.id}`, { note: 'x' })).status).toBe(403);
+      expect((await call('admin', 'PATCH', '/admin/invites/99999', { note: 'x' })).status).toBe(404);
+      expect((await call('admin', 'PATCH', '/admin/invites/nope', { note: 'x' })).status).toBe(404);
+    });
+
+    it('revokes a partly used invite without touching who already joined, and freezes it', async () => {
+      const invite = await issue({ maxUses: 5 });
+      expect((await signup(invite.code, 'kept_user')).status).toBe(201);
+
+      expect((await call('admin', 'DELETE', `/admin/invites/${invite.id}`)).status).toBe(204);
+      expect((await signup(invite.code)).status).toBe(400);
+      expect((await db.user.findFirstOrThrow({ where: { username: 'kept_user' } })).state).toBe('active');
+      expect((await listed(invite.id)).redeemedBy.map((user) => user.username)).toEqual(['kept_user']);
+
+      const edit = await call('admin', 'PATCH', `/admin/invites/${invite.id}`, { maxUses: 10 });
+      expect(edit.status).toBe(409);
+      expect(await edit.json()).toMatchObject({ code: 'revoked' });
+
+      // Revoking again is a no-op, not a second audit row.
+      expect((await call('admin', 'DELETE', `/admin/invites/${invite.id}`)).status).toBe(204);
+      expect(await db.auditLog.count({ where: { action: 'invite.revoked', subjectId: invite.id } })).toBe(1);
     });
   });
 });

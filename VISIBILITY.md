@@ -93,7 +93,7 @@ this property is load-bearing. **if invite issuance is ever opened to a lower ti
 
 `settings.invite_min_tier` therefore is not an ordinary setting. it is writable by the **owner only**, the interface states plainly that lowering it creates that graph, and the change is audited. lowering it is also effectively irreversible: raising it back does not unbuild the graph it created while it was low.
 
-codes are single-use, hashed at rest, expire after 14 days by default, and are revocable before consumption. a leaked code therefore costs at most one account and stops mattering quickly.
+codes are hashed at rest, single-use and expiring after 14 days by default, and revocable at any time. with the defaults, a leaked code costs at most one account and stops mattering quickly. an admin can issue a code with more uses, unlimited uses, or no expiry; a leak of one of those costs as many accounts as it has uses left until it is revoked or expires, and the panel says so when one is issued. none of this changes the identity graph above — every code is still admin-issued, and only admins see who used which.
 
 ## structural leaks and how they're closed
 

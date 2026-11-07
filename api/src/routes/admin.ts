@@ -15,6 +15,12 @@ import { inviteMinTier, inviteTtlDays, setSetting, settingsWithTiers } from '../
 import { TIER, canSetTier } from '../tier.js';
 
 /**
+ * The most an invite can admit, short of unlimited. Not a security boundary —
+ * unlimited exists — just a ceiling on typos.
+ */
+const MAX_INVITE_USES = 10_000;
+
+/**
  * Everything here is gated on the server. Hiding the admin panel in the
  * frontend is presentation, not authorization.
  *
@@ -564,6 +570,11 @@ export function adminRoutes(): Hono<AppEnv> {
 
   /* -------------------------------------------------------------- invites */
 
+  /** Ids in a path are bigserials. Anything else is a 404, not a 500. */
+  const inviteIdParam = (raw: string): bigint | null => (/^\d{1,18}$/.test(raw) ? BigInt(raw) : null);
+
+  const isoOrNull = (date: Date | null): string | null => (date === null ? null : date.toISOString());
+
   app.get('/admin/invites', async (c) => {
     const pageSize = parseLimit(c.req.query('limit'));
     const cursor = decodeCursor(c.req.query('cursor'));
@@ -572,15 +583,20 @@ export function adminRoutes(): Hono<AppEnv> {
       where: before(cursor),
       orderBy: { id: 'desc' },
       take: pageSize + 1,
+      include: {
+        redeemers: {
+          select: { publicId: true, username: true, createdAt: true },
+          orderBy: { id: 'asc' },
+        },
+      },
     });
 
     const issuerIds = [...new Set(rows.map((row) => row.issuedBy))];
-    const consumerIds = rows.flatMap((row) => (row.consumedBy === null ? [] : [row.consumedBy]));
-    const users = await db.user.findMany({
-      where: { id: { in: [...issuerIds, ...consumerIds] } },
-      select: { id: true, publicId: true, username: true },
+    const issuers = await db.user.findMany({
+      where: { id: { in: issuerIds } },
+      select: { id: true, username: true },
     });
-    const byId = new Map(users.map((row) => [String(row.id), row]));
+    const issuerById = new Map(issuers.map((row) => [String(row.id), row.username]));
 
     return c.json(
       toPage(
@@ -590,13 +606,20 @@ export function adminRoutes(): Hono<AppEnv> {
           // The code itself is hashed at rest and is never readable again.
           id: String(row.id),
           issuedAt: row.issuedAt.toISOString(),
-          expiresAt: row.expiresAt.toISOString(),
+          expiresAt: isoOrNull(row.expiresAt),
+          maxUses: row.maxUses,
+          // A flag, not the `uses` counter: no endpoint emits a number of
+          // anything. The panel counts `redeemedBy` itself, which an admin can
+          // see in full anyway.
+          exhausted: row.maxUses !== null && row.uses >= row.maxUses,
+          redeemedBy: row.redeemers.map((user) => ({
+            publicId: user.publicId,
+            username: user.username,
+            joinedAt: user.createdAt.toISOString(),
+          })),
           note: row.note,
-          issuedBy: byId.get(String(row.issuedBy))?.username ?? null,
-          consumedBy:
-            row.consumedBy === null ? null : byId.get(String(row.consumedBy))?.username ?? null,
-          consumedAt: row.consumedAt === null ? null : row.consumedAt.toISOString(),
-          revokedAt: row.revokedAt === null ? null : row.revokedAt.toISOString(),
+          issuedBy: issuerById.get(String(row.issuedBy)) ?? null,
+          revokedAt: isoOrNull(row.revokedAt),
         }),
         idCursor,
       ),
@@ -616,21 +639,24 @@ export function adminRoutes(): Hono<AppEnv> {
     const body = z
       .object({
         note: z.string().trim().max(200).optional().default(''),
-        ttlDays: z.number().int().min(1).max(90).optional(),
+        // null is unlimited. Absent is one use, as every invite used to be.
+        maxUses: z.number().int().min(1).max(MAX_INVITE_USES).nullable().optional().default(1),
+        // null never expires. Absent is the instance's `invite_ttl_days`.
+        ttlDays: z.number().int().min(1).max(365).nullable().optional(),
       })
       .safeParse(await c.req.json().catch(() => ({})));
+    if (!body.success) throw invalid('maxUses and ttlDays are whole numbers or null', 'invalid_body');
 
-    const ttl = body.success && body.data.ttlDays !== undefined
-      ? body.data.ttlDays
-      : await inviteTtlDays();
+    const ttl = body.data.ttlDays === undefined ? await inviteTtlDays() : body.data.ttlDays;
 
     const code = inviteCode();
     const invite = await db.invite.create({
       data: {
         codeHash: hashToken(code),
         issuedBy: actor.id,
-        expiresAt: new Date(Date.now() + ttl * 86_400_000),
-        note: body.success && body.data.note !== '' ? body.data.note : null,
+        expiresAt: ttl === null ? null : new Date(Date.now() + ttl * 86_400_000),
+        maxUses: body.data.maxUses,
+        note: body.data.note === '' ? null : body.data.note,
       },
     });
 
@@ -639,20 +665,128 @@ export function adminRoutes(): Hono<AppEnv> {
       action: 'invite.issued',
       subjectType: 'invite',
       subjectId: String(invite.id),
-      after: { expiresAt: invite.expiresAt.toISOString() },
+      after: { expiresAt: isoOrNull(invite.expiresAt), maxUses: invite.maxUses },
     });
 
-    // Single-use, hashed at rest, and shown exactly once. A leaked code costs
-    // at most one account and stops mattering in fourteen days.
-    return c.json({ id: String(invite.id), code, expiresAt: invite.expiresAt.toISOString() }, 201);
+    // Hashed at rest and shown exactly once. With the defaults a leaked code
+    // costs at most one account and stops mattering in fourteen days; a
+    // multi-use or non-expiring code is the issuer choosing to widen that.
+    return c.json(
+      {
+        id: String(invite.id),
+        code,
+        expiresAt: isoOrNull(invite.expiresAt),
+        maxUses: invite.maxUses,
+      },
+      201,
+    );
   });
 
+  /**
+   * Change an invite's note, use limit, or expiry.
+   *
+   * Gated exactly like issuance: raising the limit or pushing back the expiry
+   * admits more people, which is issuing by another name. A used-up or expired
+   * invite can be edited — that is how one is reopened — but a revoked one
+   * cannot. Revocation is the final word on a code.
+   */
+  app.patch('/admin/invites/:id', async (c) => {
+    const actor = requireTier(c.get('viewer'), TIER.admin);
+
+    const minimum = await inviteMinTier();
+    if (actor.tier < minimum) throw forbidden('this instance restricts who may issue invites');
+
+    const body = z
+      .object({
+        note: z.string().trim().max(200).optional(),
+        maxUses: z.number().int().min(1).max(MAX_INVITE_USES).nullable().optional(),
+        expiresAt: z.string().datetime({ offset: true }).nullable().optional(),
+      })
+      .refine(
+        (data) => data.note !== undefined || data.maxUses !== undefined || data.expiresAt !== undefined,
+      )
+      .safeParse(await c.req.json().catch(() => ({})));
+    if (!body.success) throw invalid('send a note, maxUses, or expiresAt', 'invalid_body');
+
+    const id = inviteIdParam(c.req.param('id'));
+    const invite = id === null ? null : await db.invite.findUnique({ where: { id } });
+    if (invite === null) throw notFound('no such invite');
+    if (invite.revokedAt !== null) throw conflict('revoked', 'a revoked invite cannot be changed');
+
+    const { note, maxUses } = body.data;
+    const expiresAt =
+      body.data.expiresAt === undefined
+        ? undefined
+        : body.data.expiresAt === null
+          ? null
+          : new Date(body.data.expiresAt);
+    if (expiresAt instanceof Date && expiresAt.getTime() <= Date.now()) {
+      throw invalid('an expiry has to be in the future; revoke the invite to end it now', 'expiry_in_past');
+    }
+
+    // Only what actually changes is written and audited.
+    const nextNote = note === undefined ? undefined : note === '' ? null : note;
+    const data: { note?: string | null; maxUses?: number | null; expiresAt?: Date | null } = {};
+    const before: Record<string, unknown> = {};
+    const after: Record<string, unknown> = {};
+    if (nextNote !== undefined && nextNote !== invite.note) {
+      data.note = nextNote;
+      before['note'] = invite.note;
+      after['note'] = nextNote;
+    }
+    if (maxUses !== undefined && maxUses !== invite.maxUses) {
+      data.maxUses = maxUses;
+      before['maxUses'] = invite.maxUses;
+      after['maxUses'] = maxUses;
+    }
+    if (expiresAt !== undefined && isoOrNull(expiresAt) !== isoOrNull(invite.expiresAt)) {
+      data.expiresAt = expiresAt;
+      before['expiresAt'] = isoOrNull(invite.expiresAt);
+      after['expiresAt'] = isoOrNull(expiresAt);
+    }
+    if (Object.keys(data).length === 0) return c.body(null, 204);
+
+    // Conditional on the state read above still holding. A signup can claim a
+    // use between that read and this write; the limit must never land below
+    // what has actually been spent.
+    const result = await db.invite.updateMany({
+      where: {
+        id: invite.id,
+        revokedAt: null,
+        ...(typeof data.maxUses === 'number' ? { uses: { lte: data.maxUses } } : {}),
+      },
+      data,
+    });
+    if (result.count === 0) {
+      const current = await db.invite.findUnique({ where: { id: invite.id } });
+      if (current?.revokedAt !== null) throw conflict('revoked', 'a revoked invite cannot be changed');
+      throw conflict('below_uses', 'more people have already used this invite than that');
+    }
+
+    await audit({
+      actorId: actor.id,
+      action: 'invite.edited',
+      subjectType: 'invite',
+      subjectId: String(invite.id),
+      before,
+      after,
+    });
+
+    return c.body(null, 204);
+  });
+
+  /**
+   * Revoke stops future signups and nothing else. Accounts that already used
+   * the code are untouched — and a partly used multi-use invite is exactly the
+   * one most worth being able to close.
+   */
   app.delete('/admin/invites/:id', async (c) => {
     const actor = requireTier(c.get('viewer'), TIER.admin);
 
-    const invite = await db.invite.findUnique({ where: { id: BigInt(c.req.param('id')) } });
+    const id = inviteIdParam(c.req.param('id'));
+    const invite = id === null ? null : await db.invite.findUnique({ where: { id } });
     if (invite === null) throw notFound('no such invite');
-    if (invite.consumedAt !== null) throw conflict('already_consumed', 'that invite was used');
+    if (invite.revokedAt !== null) return c.body(null, 204);
 
     await db.invite.update({ where: { id: invite.id }, data: { revokedAt: new Date() } });
     await audit({

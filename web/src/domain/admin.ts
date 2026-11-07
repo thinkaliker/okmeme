@@ -68,14 +68,29 @@ export interface AdminUser extends AdminUserRef {
   readonly sanction: Omit<AdminSanctionRef, 'note'> | null;
 }
 
+/** Someone who signed up with an invite. `username` is null once the account is deleted. */
+export interface InviteRedeemer {
+  readonly publicId: string;
+  readonly username: string | null;
+  readonly joinedAt: string;
+}
+
 export interface AdminInvite {
   readonly id: string;
   readonly issuedAt: string;
-  readonly expiresAt: string;
+  /** Null never expires. */
+  readonly expiresAt: string | null;
+  /** Null is unlimited; 1 is one-time. */
+  readonly maxUses: number | null;
+  /** No further signups possible because the limit is reached. */
+  readonly exhausted: boolean;
+  /**
+   * Everyone who used it, oldest first. The server sends the list rather than
+   * a number — no endpoint emits a count — and an admin can see all of it.
+   */
+  readonly redeemedBy: readonly InviteRedeemer[];
   readonly note: string | null;
   readonly issuedBy: string | null;
-  readonly consumedBy: string | null;
-  readonly consumedAt: string | null;
   readonly revokedAt: string | null;
 }
 
@@ -83,7 +98,23 @@ export interface AdminInvite {
 export interface IssuedInvite {
   readonly id: string;
   readonly code: string;
-  readonly expiresAt: string;
+  readonly expiresAt: string | null;
+  readonly maxUses: number | null;
+}
+
+export interface InviteInput {
+  readonly note: string;
+  /** Null is unlimited. */
+  readonly maxUses: number | null;
+  /** Null never expires; undefined takes the instance's `invite_ttl_days`. */
+  readonly ttlDays?: number | null;
+}
+
+/** Only the fields present are changed. */
+export interface InvitePatch {
+  readonly note?: string;
+  readonly maxUses?: number | null;
+  readonly expiresAt?: string | null;
 }
 
 export interface AuditEntry {

@@ -31,6 +31,16 @@ export function absoluteTime(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
+/** An instant as the local, minute-precision value a `datetime-local` input takes. */
+export function toDateTimeLocal(iso: string): string {
+  const date = new Date(iso);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
+}
+
 /** Score display. Absolute rank is never shown; a raw score is. */
 export function formatScore(score: number): string {
   return new Intl.NumberFormat().format(score);

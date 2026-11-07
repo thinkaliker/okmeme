@@ -22,6 +22,7 @@ conventions:
 | `state` | enum | `active` \| `deleted` — suspension lives in its own table |
 | `show_nsfw` | boolean | default false |
 | `invited_by` | bigint fk users null | always an admin under current rules |
+| `invite_id` | bigint fk invites null | the invite spent at signup; null for the two setup accounts |
 | `created_at` | timestamptz | |
 | `deleted_at` | timestamptz null | |
 
@@ -51,7 +52,11 @@ filed unauthenticated by someone who has burned or lost all ten codes. the endpo
 
 a partial unique index on `(user_id) WHERE resolved_at IS NULL` permits one open request per account, so the queue cannot be flooded on anyone's behalf. requests never expire and are never auto-closed — the queue sorts oldest first, and nothing is quietly dismissed on a timer.
 
-**invites** — `id`, `code_hash`, `issued_by` fk users, `issued_at`, `expires_at`, `consumed_by` fk users null, `consumed_at` null, `revoked_at` null. single-use, 14-day default expiry.
+**invites** — `id`, `code_hash`, `issued_by` fk users, `issued_at`, `expires_at` null, `max_uses` null, `uses`, `revoked_at` null, `note` null. one use and the 14-day `invite_ttl_days` expiry by default; `max_uses` null is unlimited and `expires_at` null never expires, both by an admin's explicit choice.
+
+`uses` is a counter, and signup claims one with a single conditional `UPDATE … WHERE uses < max_uses`, so two people racing for the last use cannot both get in. a signup that then fails gives the use back. the counter is internal — the api lists who used an invite (`users.invite_id`) and a used-up flag, never a number. a check constraint keeps `uses <= max_uses`, so an edit cannot lower the limit below what has been spent.
+
+`consumed_by` and `consumed_at` are legacy, from when every invite was single-use. `0003_invite_options.sql` backfilled them into `users.invite_id` and `uses`, and nothing reads or writes them since. they stay because migrations are additive.
 
 ## content
 

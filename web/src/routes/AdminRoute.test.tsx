@@ -112,3 +112,56 @@ describe('admin categories tab', () => {
     await waitFor(() => expect(longReads.getByText('has links')).toBeDefined());
   });
 });
+
+describe('admin invites tab', () => {
+  it('shows who used an invite, issues a wider one, edits it, and revokes it', async () => {
+    await open('root', '/admin?tab=invites');
+
+    // Fixtures: a used-up one-time invite and a partly used five-use one.
+    const club = await rowOf('book club');
+    expect(club.getByText('2 / 5 used')).toBeDefined();
+    expect(club.getByText('never expires')).toBeDefined();
+    expect(club.getByText('kes')).toBeDefined();
+    expect(club.getByText('sandra')).toBeDefined();
+    const dana = await rowOf('for dana');
+    expect(dana.getByText('used up')).toBeDefined();
+
+    // The defaults are one-time; widening it is allowed but said out loud.
+    expect(screen.queryByText(/however far it is forwarded/)).toBeNull();
+    fireEvent.change(screen.getByLabelText('Note (optional, for your own records)'), {
+      target: { value: 'meetup' },
+    });
+    fireEvent.change(screen.getByLabelText('Max uses'), { target: { value: '3' } });
+    fireEvent.click(screen.getByLabelText('Never expires'));
+    expect(screen.getByText(/however far it is forwarded/)).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Issue an invite' }));
+
+    expect(await screen.findByText(/^okmi_mock/)).toBeDefined();
+    expect(screen.getByText(/up to 3 uses · never expires/)).toBeDefined();
+
+    // Edit: the limit goes up, and the row says so.
+    const meetup = await rowOf('meetup');
+    expect(meetup.getByText('0 / 3 used')).toBeDefined();
+    fireEvent.click(meetup.getByRole('button', { name: 'Edit' }));
+    const uses = await meetup.findByDisplayValue('3');
+    fireEvent.change(uses, { target: { value: '5' } });
+    fireEvent.click(meetup.getByRole('button', { name: 'Save' }));
+    await waitFor(async () => expect((await rowOf('meetup')).getByText('0 / 5 used')).toBeDefined());
+
+    // The limit cannot go below what has been spent. (Rows are re-queried: a
+    // reload remounts the list.)
+    const clubAgain = await rowOf('book club');
+    fireEvent.click(clubAgain.getByRole('button', { name: 'Edit' }));
+    fireEvent.change(await clubAgain.findByDisplayValue('5'), { target: { value: '1' } });
+    expect(clubAgain.getByText(/At least 2/)).toBeDefined();
+    expect(clubAgain.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true);
+    fireEvent.click(clubAgain.getByRole('button', { name: 'Cancel' }));
+
+    // Revoked is final: no more Edit or Revoke on that row.
+    fireEvent.click((await rowOf('meetup')).getByRole('button', { name: 'Revoke' }));
+    await waitFor(async () => expect((await rowOf('meetup')).getByText('revoked')).toBeDefined());
+    const revoked = await rowOf('meetup');
+    expect(revoked.queryByRole('button', { name: 'Edit' })).toBeNull();
+    expect(revoked.queryByRole('button', { name: 'Revoke' })).toBeNull();
+  });
+});

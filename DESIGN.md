@@ -106,7 +106,7 @@ bookmarks are private and are filtered by that same predicate, so a bookmarked p
 
 authors may edit their own posts indefinitely, including titles, with no window and no lock. the public "edited" marker and the full revision chain are the entire deterrent against rewriting a title after it has collected votes — anyone can see it happened, and admins can see exactly what changed.
 
-rate limits are flat across tiers rather than tier-scaled. this works because invite-only, admin-issued, single-use codes mean there is no drive-by account farming to throttle in the first place; the growth control is the invite, not the limiter. it should not be relied on as an anti-sockpuppet measure.
+rate limits are flat across tiers rather than tier-scaled. this works because invite-only, admin-issued, single-use-by-default codes mean there is no drive-by account farming to throttle in the first place; the growth control is the invite, not the limiter. an admin may issue a code good for several people, or unlimited, or never expiring — that widens the door deliberately, and the invite's own limit, expiry and revocation are what bound it. it should not be relied on as an anti-sockpuppet measure.
 
 ## moderation
 

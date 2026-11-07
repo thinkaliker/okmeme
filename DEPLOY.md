@@ -494,11 +494,14 @@ anything.
 2. Click **Admin** in the left sidebar.
 3. Click the **Invites** tab.
 4. Optionally type a note in the box (it is for your own records — the invitee
-   never sees it).
+   never sees it). Leave **Max uses** at 1 and the expiry empty for the default:
+   one person, 14 days. A larger number, an empty **Max uses** (unlimited), or
+   **Never expires** widen that — the panel warns you when you do.
 5. Click **Issue an invite**.
 6. A code appears, like `okmi_7fk2m9qxwb3nrh4d`. **Copy it now** — it is hashed
-   at rest and cannot be shown again. It is single-use and expires in 14 days,
-   and you can revoke it until it is spent.
+   at rest and cannot be shown again. You can change its note, limit and expiry
+   later with **Edit**, see who signed up with it on its row, and revoke it at
+   any time; revoking stops new signups and leaves existing accounts alone.
 7. Send them `https://okmeme.example.com/signup` and the code.
 
 You will also want at least one category before anyone can post — the submit

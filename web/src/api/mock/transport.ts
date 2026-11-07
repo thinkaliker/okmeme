@@ -8,6 +8,7 @@ import {
   type MockLink,
   type MockUser,
 } from '@/api/mock/data';
+import type { AdminInvite } from '@/domain/admin';
 import type { Author } from '@/domain/author';
 import type { Category, Link, PreviewResult, SubmitDraft, Tag, TagProposal } from '@/domain/link';
 import type { Notification } from '@/domain/notification';
@@ -84,6 +85,43 @@ interface Proposal {
   proposedAt: string;
 }
 
+/**
+ * Two invites that have been used, so the panel's "used by" line has something
+ * to show. Nothing in the fake can sign anyone up; redemptions are fixtures.
+ */
+function seedInvites(): AdminInvite[] {
+  const inDays = (days: number) => new Date(START + days * 86_400_000).toISOString();
+  const joined = (username: string, minutesAgo: number) => ({
+    publicId: `u_${username}`,
+    username,
+    joinedAt: isoFromMinutes(minutesAgo),
+  });
+  return [
+    {
+      id: '1',
+      issuedAt: isoFromMinutes(60 * 24 * 20),
+      expiresAt: inDays(-6),
+      maxUses: 1,
+      exhausted: true,
+      redeemedBy: [joined('dana', 60 * 24 * 19)],
+      note: 'for dana',
+      issuedBy: 'root',
+      revokedAt: null,
+    },
+    {
+      id: '2',
+      issuedAt: isoFromMinutes(60 * 24 * 3),
+      expiresAt: null,
+      maxUses: 5,
+      exhausted: false,
+      redeemedBy: [joined('kes', 60 * 24 * 2), joined('sandra', 60 * 5)],
+      note: 'book club',
+      issuedBy: 'root',
+      revokedAt: null,
+    },
+  ];
+}
+
 interface State {
   sessionUserId: number | null;
   rows: Row[];
@@ -95,6 +133,7 @@ interface State {
   approvedTags: Tag[];
   proposals: Map<string, Proposal>;
   categories: Category[];
+  invites: AdminInvite[];
   nextId: number;
 }
 
@@ -111,6 +150,7 @@ const state: State = {
   approvedTags: MOCK_TAGS.map((tag) => ({ ...tag, pending: false })),
   proposals: new Map(),
   categories: [...MOCK_CATEGORIES],
+  invites: seedInvites(),
   nextId: 1000,
 };
 
@@ -883,9 +923,85 @@ function handle(method: Method, path: string, options: RequestOptions): unknown 
     };
   }
 
-  if (method === 'GET' && /^\/admin\/(reports|appeals|recovery-requests|users|invites|audit|suspensions\/indefinite)$/.test(path)) {
+  if (method === 'GET' && /^\/admin\/(reports|appeals|recovery-requests|users|audit|suspensions\/indefinite)$/.test(path)) {
     if (currentTier() < TIER.admin) throw new ApiError(403, 'forbidden', 'admin only');
     return EMPTY_PAGE;
+  }
+
+  /*
+   * Invites, modelled like categories: the panel's rules — a limit can never
+   * drop below what has been spent, and revoked is final — are worth
+   * exercising without a server. The code is fake and cannot sign anyone up.
+   */
+  if (method === 'GET' && path === '/admin/invites') {
+    requireAdmin();
+    return { items: [...state.invites].sort((a, b) => Number(b.id) - Number(a.id)), nextCursor: null };
+  }
+
+  if (method === 'POST' && path === '/admin/invites') {
+    const user = requireAdmin();
+    const body = (options.body ?? {}) as { note?: unknown; maxUses?: unknown; ttlDays?: unknown };
+    const maxUses = body.maxUses === undefined ? 1 : body.maxUses;
+    const ttlDays = body.ttlDays === undefined ? 14 : body.ttlDays;
+    const whole = (value: unknown, max: number): value is number =>
+      Number.isInteger(value) && (value as number) >= 1 && (value as number) <= max;
+    if ((maxUses !== null && !whole(maxUses, 10_000)) || (ttlDays !== null && !whole(ttlDays, 365))) {
+      throw new ApiError(400, 'invalid_body', 'maxUses and ttlDays are whole numbers or null');
+    }
+    state.nextId += 1;
+    const id = String(state.nextId);
+    const expiresAt = ttlDays === null ? null : new Date(Date.now() + ttlDays * 86_400_000).toISOString();
+    const note = String(body.note ?? '').trim();
+    state.invites = [
+      ...state.invites,
+      {
+        id,
+        issuedAt: new Date().toISOString(),
+        expiresAt,
+        maxUses,
+        exhausted: false,
+        redeemedBy: [],
+        note: note === '' ? null : note,
+        issuedBy: user.username,
+        revokedAt: null,
+      },
+    ];
+    return { id, code: `okmi_mock${id}`, expiresAt, maxUses };
+  }
+
+  const inviteMatch = /^\/admin\/invites\/([^/]+)$/.exec(path);
+  if (inviteMatch?.[1] !== undefined && (method === 'PATCH' || method === 'DELETE')) {
+    requireAdmin();
+    const id = inviteMatch[1];
+    const existing = state.invites.find((invite) => invite.id === id);
+    if (existing === undefined) throw new ApiError(404, 'not_found', 'no such invite');
+    const replace = (next: AdminInvite) => {
+      state.invites = state.invites.map((invite) => (invite.id === id ? next : invite));
+    };
+
+    if (method === 'DELETE') {
+      if (existing.revokedAt === null) replace({ ...existing, revokedAt: new Date().toISOString() });
+      return null;
+    }
+
+    if (existing.revokedAt !== null) throw new ApiError(409, 'revoked', 'a revoked invite cannot be changed');
+    const body = (options.body ?? {}) as { note?: string; maxUses?: number | null; expiresAt?: string | null };
+    let next: AdminInvite = existing;
+    if (body.note !== undefined) next = { ...next, note: body.note.trim() === '' ? null : body.note.trim() };
+    if (body.maxUses !== undefined) {
+      if (body.maxUses !== null && body.maxUses < existing.redeemedBy.length) {
+        throw new ApiError(409, 'below_uses', 'more people have already used this invite than that');
+      }
+      next = { ...next, maxUses: body.maxUses };
+    }
+    if (body.expiresAt !== undefined) {
+      if (body.expiresAt !== null && new Date(body.expiresAt).getTime() <= Date.now()) {
+        throw new ApiError(400, 'expiry_in_past', 'an expiry has to be in the future; revoke the invite to end it now');
+      }
+      next = { ...next, expiresAt: body.expiresAt };
+    }
+    replace({ ...next, exhausted: next.maxUses !== null && next.redeemedBy.length >= next.maxUses });
+    return null;
   }
 
   if (method === 'GET' && path === '/admin/settings') {

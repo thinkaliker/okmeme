@@ -18,6 +18,8 @@ import type {
   AppealOutcome,
   AuditEntry,
   InstanceSetting,
+  InvitePatch,
+  IssuedInvite,
 } from '@/domain/admin';
 import type { TagProposal } from '@/domain/link';
 import type { ReasonCategory, SuspensionType } from '@/domain/user';
@@ -34,7 +36,7 @@ import type { MessageKey } from '@/i18n/en';
 import { t, tierLabel } from '@/i18n/t';
 import { toCategorySlug } from '@/lib/slug';
 import { tintDot } from '@/lib/tint';
-import { absoluteTime, relativeTime } from '@/lib/utils';
+import { absoluteTime, relativeTime, toDateTimeLocal } from '@/lib/utils';
 import { useSession } from '@/session/SessionProvider';
 
 /**
@@ -1077,52 +1079,284 @@ function Categories() {
 
 /* ---------------------------------------------------------------- invites */
 
+/** `''` is unlimited. Anything else must be a whole number of at least one. */
+function parseUses(raw: string): number | null | undefined {
+  const text = raw.trim();
+  if (text === '') return null;
+  const value = Number(text);
+  return Number.isInteger(value) && value >= 1 && value <= 10_000 ? value : undefined;
+}
+
+function limitLabel(maxUses: number | null): string {
+  if (maxUses === null) return t('admin.inviteUnlimited');
+  if (maxUses === 1) return t('admin.inviteOneTime');
+  return t('admin.inviteUpTo', { count: maxUses });
+}
+
+/** Counted from the list itself. The server never sends a number of uses. */
+function usageLabel(invite: AdminInvite): string {
+  const used = invite.redeemedBy.length;
+  if (invite.maxUses === null) return t('admin.inviteUsageUnlimited', { used });
+  if (invite.maxUses === 1) return t('admin.inviteOneTime');
+  return t('admin.inviteUsage', { used, max: invite.maxUses });
+}
+
+function expiryLabel(expiresAt: string | null): string {
+  if (expiresAt === null) return t('admin.inviteNoExpiry');
+  const when = relativeTime(expiresAt);
+  return new Date(expiresAt).getTime() < Date.now()
+    ? t('admin.inviteExpiredWhen', { when })
+    : t('admin.inviteExpiresIn', { when });
+}
+
+/** Revoked is final, so it wins; used up outranks expired because it is the reason to edit. */
+function inviteStatus(invite: AdminInvite): string | null {
+  if (invite.revokedAt !== null) return t('admin.inviteRevoked');
+  if (invite.exhausted) return t('admin.inviteConsumed');
+  if (invite.expiresAt !== null && new Date(invite.expiresAt).getTime() < Date.now()) {
+    return t('admin.inviteExpired');
+  }
+  return null;
+}
+
+function InviteEditor({
+  invite,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  invite: AdminInvite;
+  busy: boolean;
+  onSave: (patch: InvitePatch) => void;
+  onCancel: () => void;
+}) {
+  const initialExpiry = invite.expiresAt === null ? '' : toDateTimeLocal(invite.expiresAt);
+  const [note, setNote] = useState(invite.note ?? '');
+  const [maxUses, setMaxUses] = useState(invite.maxUses === null ? '' : String(invite.maxUses));
+  const [expires, setExpires] = useState(initialExpiry);
+  const [never, setNever] = useState(invite.expiresAt === null);
+
+  const used = invite.redeemedBy.length;
+  const parsedUses = parseUses(maxUses);
+  const usesValid = parsedUses !== undefined && (parsedUses === null || parsedUses >= used);
+  const expiryValid = never || expires !== '';
+
+  function save() {
+    // Only what changed. Round-tripping the expiry through a minute-precision
+    // input would otherwise move it by a few seconds and audit a non-change.
+    const patch: { note?: string; maxUses?: number | null; expiresAt?: string | null } = {};
+    if (note.trim() !== (invite.note ?? '')) patch.note = note.trim();
+    if (parsedUses !== undefined && parsedUses !== invite.maxUses) patch.maxUses = parsedUses;
+    if (never) {
+      if (invite.expiresAt !== null) patch.expiresAt = null;
+    } else if (invite.expiresAt === null || expires !== initialExpiry) {
+      patch.expiresAt = new Date(expires).toISOString();
+    }
+    if (Object.keys(patch).length === 0) onCancel();
+    else onSave(patch);
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-3 rounded-md border border-border p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (usesValid && expiryValid) save();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onCancel();
+      }}
+    >
+      <div className="flex flex-col gap-1">
+        <Label htmlFor={`invite-edit-note-${invite.id}`} className="text-xs">
+          {t('admin.inviteNote')}
+        </Label>
+        <Input
+          id={`invite-edit-note-${invite.id}`}
+          autoFocus
+          value={note}
+          maxLength={200}
+          onChange={(event) => setNote(event.target.value)}
+        />
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <div className="flex w-40 flex-col gap-1">
+          <Label htmlFor={`invite-edit-uses-${invite.id}`} className="text-xs">
+            {t('admin.inviteMaxUses')}
+          </Label>
+          <Input
+            id={`invite-edit-uses-${invite.id}`}
+            type="number"
+            min={Math.max(1, used)}
+            step={1}
+            placeholder={t('admin.inviteUnlimited')}
+            value={maxUses}
+            onChange={(event) => setMaxUses(event.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor={`invite-edit-expires-${invite.id}`} className="text-xs">
+            {t('admin.inviteExpiresAt')}
+          </Label>
+          <Input
+            id={`invite-edit-expires-${invite.id}`}
+            type="datetime-local"
+            value={expires}
+            disabled={never}
+            onChange={(event) => setExpires(event.target.value)}
+          />
+        </div>
+        <label className="flex items-center gap-2 self-end pb-2 text-sm">
+          <input
+            type="checkbox"
+            className="accent-primary"
+            checked={never}
+            onChange={(event) => setNever(event.target.checked)}
+          />
+          {t('admin.inviteNeverExpires')}
+        </label>
+      </div>
+      <FieldHint className={usesValid ? undefined : 'text-destructive'}>
+        {used > 1 ? t('admin.inviteMaxUsesFloor', { count: used }) : t('admin.inviteMaxUsesHint')}
+      </FieldHint>
+      <div className="flex gap-2">
+        <Button size="sm" type="submit" disabled={busy || !usesValid || !expiryValid}>
+          {t('admin.save')}
+        </Button>
+        <Button size="sm" type="button" variant="outline" onClick={onCancel}>
+          {t('admin.cancel')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function Invites() {
   const state = useCursorList<AdminInvite>(
     (cursor, signal) => admin.invites(cursor, { signal }),
     [],
   );
   const [note, setNote] = useState('');
-  const [issued, setIssued] = useState<{ code: string; expiresAt: string } | null>(null);
+  const [maxUses, setMaxUses] = useState('1');
+  const [ttlDays, setTtlDays] = useState('');
+  const [never, setNever] = useState(false);
+  const [issued, setIssued] = useState<IssuedInvite | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function issue() {
+  const parsedUses = parseUses(maxUses);
+  const parsedTtl = ttlDays.trim() === '' ? undefined : Number(ttlDays);
+  const ttlValid =
+    never || parsedTtl === undefined || (Number.isInteger(parsedTtl) && parsedTtl >= 1 && parsedTtl <= 365);
+  const canIssue = parsedUses !== undefined && ttlValid;
+  // One-time and expiring is the only shape where a leaked code costs one account.
+  const wide = parsedUses !== 1 || never;
+
+  async function run(work: () => Promise<void>) {
+    setBusy(true);
     setError(null);
     try {
-      const invite = await admin.createInvite(note);
-      setIssued({ code: invite.code, expiresAt: invite.expiresAt });
-      setNote('');
+      await work();
       state.reload();
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : t('app.error'));
+    } finally {
+      setBusy(false);
     }
   }
 
-  function statusOf(invite: AdminInvite): string | null {
-    if (invite.consumedAt !== null) return t('admin.inviteConsumed');
-    if (invite.revokedAt !== null) return t('admin.inviteRevoked');
-    if (new Date(invite.expiresAt).getTime() < Date.now()) return t('admin.inviteExpired');
-    return null;
+  function issue() {
+    if (parsedUses === undefined) return;
+    void run(async () => {
+      const invite = await admin.createInvite({
+        note,
+        maxUses: parsedUses,
+        ...(never ? { ttlDays: null } : parsedTtl === undefined ? {} : { ttlDays: parsedTtl }),
+      });
+      setIssued(invite);
+      setNote('');
+      setMaxUses('1');
+      setTtlDays('');
+      setNever(false);
+    });
   }
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex min-w-48 flex-1 flex-col gap-1">
-          <Label htmlFor="invite-note" className="text-xs">
-            {t('admin.inviteNote')}
-          </Label>
-          <Input id="invite-note" value={note} onChange={(event) => setNote(event.target.value)} />
+      <form
+        className="flex flex-col gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (canIssue) issue();
+        }}
+      >
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex min-w-48 flex-1 flex-col gap-1">
+            <Label htmlFor="invite-note" className="text-xs">
+              {t('admin.inviteNote')}
+            </Label>
+            <Input
+              id="invite-note"
+              value={note}
+              maxLength={200}
+              onChange={(event) => setNote(event.target.value)}
+            />
+          </div>
+          <div className="flex w-28 flex-col gap-1">
+            <Label htmlFor="invite-max-uses" className="text-xs">
+              {t('admin.inviteMaxUses')}
+            </Label>
+            <Input
+              id="invite-max-uses"
+              type="number"
+              min={1}
+              step={1}
+              placeholder={t('admin.inviteUnlimited')}
+              value={maxUses}
+              onChange={(event) => setMaxUses(event.target.value)}
+            />
+          </div>
+          <div className="flex w-36 flex-col gap-1">
+            <Label htmlFor="invite-ttl" className="text-xs">
+              {t('admin.inviteTtlDays')}
+            </Label>
+            <Input
+              id="invite-ttl"
+              type="number"
+              min={1}
+              max={365}
+              step={1}
+              value={ttlDays}
+              disabled={never}
+              onChange={(event) => setTtlDays(event.target.value)}
+            />
+          </div>
+          <label className="flex items-center gap-2 pb-2 text-sm">
+            <input
+              type="checkbox"
+              className="accent-primary"
+              checked={never}
+              onChange={(event) => setNever(event.target.checked)}
+            />
+            {t('admin.inviteNeverExpires')}
+          </label>
+          <Button size="sm" type="submit" disabled={busy || !canIssue}>
+            {t('admin.newInvite')}
+          </Button>
         </div>
-        <Button size="sm" onClick={() => void issue()}>
-          {t('admin.newInvite')}
-        </Button>
-      </div>
+        <FieldHint className={parsedUses === undefined ? 'text-destructive' : undefined}>
+          {t('admin.inviteMaxUsesHint')} {never ? null : t('admin.inviteTtlHint')}
+        </FieldHint>
+        {/* The defaults are the only shape where a leaked code costs at most
+            one account. Anything wider is allowed, but said out loud. */}
+        {wide ? <FieldHint className="text-destructive">{t('admin.inviteWideWarning')}</FieldHint> : null}
+      </form>
 
       {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
 
-      {/* Hashed at rest and single-use. Once this box is dismissed the code
-          exists nowhere but wherever the admin put it. */}
+      {/* Hashed at rest. Once this box is dismissed the code exists nowhere but
+          wherever the admin put it. */}
       {issued === null ? null : (
         <div className="flex flex-col gap-2 rounded-lg border border-primary/40 bg-accent/40 p-3">
           <p className="text-sm">{t('admin.inviteIssued')}</p>
@@ -1130,7 +1364,10 @@ function Invites() {
             {issued.code}
           </code>
           <p className="text-xs text-muted-foreground">
-            {t('sanction.expires')}: {absoluteTime(issued.expiresAt)}
+            {limitLabel(issued.maxUses)} ·{' '}
+            {issued.expiresAt === null
+              ? t('admin.inviteNoExpiry')
+              : `${t('sanction.expires')}: ${absoluteTime(issued.expiresAt)}`}
           </p>
           <div>
             <Button size="sm" variant="outline" onClick={() => setIssued(null)}>
@@ -1144,26 +1381,75 @@ function Invites() {
         state={state}
         keyOf={(invite) => invite.id}
         render={(invite) => {
-          const status = statusOf(invite);
+          const status = inviteStatus(invite);
+          const revoked = invite.revokedAt !== null;
           return (
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted-foreground">#{invite.id}</span>
-              {invite.note === null ? null : <span>{invite.note}</span>}
-              {status === null ? null : <Badge variant="outline">{status}</Badge>}
-              {invite.consumedBy === null ? null : (
-                <span className="text-xs text-muted-foreground">→ {invite.consumedBy}</span>
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-muted-foreground">#{invite.id}</span>
+                {invite.note === null ? null : <span>{invite.note}</span>}
+                {status === null ? null : <Badge variant="outline">{status}</Badge>}
+                <span className="text-xs text-muted-foreground">{usageLabel(invite)}</span>
+                {revoked ? null : (
+                  <span className="text-xs text-muted-foreground">{expiryLabel(invite.expiresAt)}</span>
+                )}
+                <time className="ml-auto text-xs text-muted-foreground" dateTime={invite.issuedAt}>
+                  {relativeTime(invite.issuedAt)}
+                </time>
+                {revoked ? null : (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => setEditing(editing === invite.id ? null : invite.id)}
+                    >
+                      {t('admin.edit')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await admin.revokeInvite(invite.id);
+                          if (editing === invite.id) setEditing(null);
+                        })
+                      }
+                    >
+                      {t('admin.revoke')}
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {invite.redeemedBy.length === 0 ? null : (
+                <p className="text-xs text-muted-foreground">
+                  {t('admin.inviteUsedBy')}:{' '}
+                  {invite.redeemedBy.map((user, index) => (
+                    <Fragment key={user.publicId}>
+                      {index === 0 ? null : ', '}
+                      <span className="text-foreground">
+                        {user.username ?? t('admin.inviteDeletedAccount')}
+                      </span>{' '}
+                      <time dateTime={user.joinedAt}>({relativeTime(user.joinedAt)})</time>
+                    </Fragment>
+                  ))}
+                </p>
               )}
-              <time className="ml-auto text-xs text-muted-foreground" dateTime={invite.issuedAt}>
-                {relativeTime(invite.issuedAt)}
-              </time>
-              {status === null ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void admin.revokeInvite(invite.id).then(state.reload)}
-                >
-                  {t('admin.revoke')}
-                </Button>
+
+              {editing === invite.id && !revoked ? (
+                <InviteEditor
+                  invite={invite}
+                  busy={busy}
+                  onCancel={() => setEditing(null)}
+                  onSave={(patch) =>
+                    void run(async () => {
+                      await admin.updateInvite(invite.id, patch);
+                      setEditing(null);
+                    })
+                  }
+                />
               ) : null}
             </div>
           );

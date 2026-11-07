@@ -44,7 +44,7 @@ flat across tiers, per user and per token; anonymous requests limited per ip.
 
 the setup bucket is not part of the original table. it exists because `/setup` was otherwise spending the recovery allowance for everyone behind one ip, and three page loads is not a plausible budget for a form with four fields on it.
 
-flat values mean a new limited account has the same throughput as an admin. that is acceptable **only because signup is invite-only, admin-issued, and single-use** — there is no drive-by account farming for a tiered limiter to slow down. the growth control is the invite; do not treat these numbers as an anti-sockpuppet measure.
+flat values mean a new limited account has the same throughput as an admin. that is acceptable **only because signup is invite-only, admin-issued, and single-use by default** — there is no drive-by account farming for a tiered limiter to slow down. an admin can issue a multi-use or unlimited code, and when they do, the limit on what it admits is its `max_uses`, its expiry and revocation, not these numbers. the growth control is the invite; do not treat these numbers as an anti-sockpuppet measure.
 
 ## surface
 
@@ -112,7 +112,7 @@ POST   /me/suspension/appeal            once per sanction; 409 if already filed
 ### auth
 
 ```http
-POST   /auth/signup            requires a valid, unexpired, unconsumed invite code
+POST   /auth/signup            requires an invite that is unrevoked, unexpired, and has a use left
 POST   /auth/login             local provider
 POST   /auth/logout
 POST   /auth/recover           spend a one-time recovery code
@@ -149,9 +149,10 @@ POST   /admin/users/:public_id/unsuspend
 POST   /admin/users/:public_id/reset         issue fresh recovery codes
 GET    /admin/suspensions/indefinite         open-ended sanctions, oldest first
 POST   /admin/links/:public_id/tier          moderator re-tier → pinned_tier
-GET    /admin/invites
-POST   /admin/invites
-DELETE /admin/invites/:id                    revoke before consumption
+GET    /admin/invites                        each with max_uses, expires_at, exhausted, and who used it — never a count
+POST   /admin/invites                        note, max_uses (default 1, null unlimited), ttl_days (default setting, null never)
+PATCH  /admin/invites/:id                    note, max_uses, expires_at; not below uses spent; not once revoked
+DELETE /admin/invites/:id                    revoke; stops future signups, touches no existing account
 GET    /admin/categories                     the editor's list: each category plus in_use, a boolean
 GET    /admin/audit?cursor=                  admin + owner
 GET    /admin/settings

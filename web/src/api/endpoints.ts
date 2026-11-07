@@ -22,6 +22,8 @@ import type {
   AppealOutcome,
   AuditEntry,
   InstanceSetting,
+  InviteInput,
+  InvitePatch,
   IssuedApiToken,
   IssuedInvite,
   Owner,
@@ -356,8 +358,12 @@ export const admin = {
       options({ cursor: cursor ?? undefined }, extra),
     );
   },
-  createInvite(note: string): Promise<IssuedInvite> {
-    return transport.request<IssuedInvite>('POST', '/admin/invites', { body: { note } });
+  createInvite(input: InviteInput): Promise<IssuedInvite> {
+    return transport.request<IssuedInvite>('POST', '/admin/invites', { body: input });
+  },
+  /** A revoked invite cannot be edited; a used-up or expired one can, which reopens it. */
+  updateInvite(id: string, patch: InvitePatch): Promise<void> {
+    return transport.request<void>('PATCH', `/admin/invites/${id}`, { body: patch });
   },
   revokeInvite(id: string): Promise<void> {
     return transport.request<void>('DELETE', `/admin/invites/${id}`);
