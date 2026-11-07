@@ -268,6 +268,7 @@ const PERMISSION_LABEL: Readonly<Record<Capability, string>> = {
   vote: t('permission.vote'),
   bookmark: t('permission.bookmark'),
   editOwn: t('permission.editOwn'),
+  postBelow: t('permission.postBelow'),
   postNsfw: t('permission.postNsfw'),
   createTags: t('permission.createTags'),
   moderate: t('permission.moderate'),

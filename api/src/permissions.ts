@@ -31,6 +31,7 @@ export const CAPABILITIES = [
   'vote',
   'bookmark',
   'editOwn',
+  'postBelow',
   'postNsfw',
   'createTags',
   'moderate',
@@ -69,6 +70,11 @@ const SPECS: Readonly<Record<Capability, Spec>> = {
   vote: { byDefault: can.vote, floor: TIER.limited },
   bookmark: { byDefault: can.bookmark, floor: TIER.limited },
   editOwn: { byDefault: isParticipant, floor: TIER.limited },
+  // Choosing a lower tier for your own post. Limited has none below it.
+  postBelow: {
+    byDefault: (tier) => tier >= TIER.staff && tier < TIER.owner,
+    floor: TIER.full,
+  },
   postNsfw: { byDefault: can.postNsfw, floor: TIER.full },
   createTags: { byDefault: can.createTags, floor: TIER.limited },
   moderate: { byDefault: can.moderateContent, floor: TIER.full },

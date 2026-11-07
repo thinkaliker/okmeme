@@ -149,6 +149,21 @@ describe.skipIf(!enabled)('the visibility predicate', () => {
     expect(await titlesFor(viewer(TIER.anonymous))).toContain('l_pinned');
   });
 
+  it('never names an author to a tier their post was pinned down to', async () => {
+    const pinnedFor = async (v: Viewer) => {
+      const rows = await queryLinks({ viewer: v, limit: 50, cursor: null, sort: 'new' });
+      const row = rows.find((candidate) => candidate.public_id === 'l_pinned');
+      expect(row).toBeDefined();
+      return authorPayload(v, row!);
+    };
+    // Authored by an admin and pinned to limited. Visible far down, but the
+    // name stays where the admin could already be seen.
+    expect(await pinnedFor(viewer(TIER.anonymous))).toEqual({ kind: 'tier', label: 'limited' });
+    expect(await pinnedFor(viewer(TIER.limited, ids['limited']!))).toEqual({ kind: 'tier', label: 'full' });
+    expect(await pinnedFor(viewer(TIER.full, ids['full']!))).toEqual({ kind: 'tier', label: 'staff' });
+    expect(await pinnedFor(viewer(TIER.admin, ids['admin']!))).toMatchObject({ kind: 'user' });
+  });
+
   it('resolves an above-tier author to a bare label with no id in the payload', async () => {
     const rows = await queryLinks({
       viewer: viewer(TIER.limited, ids['limited']!),

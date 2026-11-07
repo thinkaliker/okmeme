@@ -85,6 +85,8 @@ POST   /tags/:slug/approve     staff+
 DELETE /tags/:slug             staff+; rejects a pending proposal
 ```
 
+`POST /links` accepts an optional `pinnedTier`: a tier at or below the author's own for the post to live at, for a wider audience. null, absent, or the author's own tier all mean "follow the author", as before. a tier above the author's is refused, and anything else needs the `postBelow` permission. the author is still named only to viewers at or above their own tier — see [VISIBILITY.md](VISIBILITY.md#a-pin-moves-the-post-not-its-author).
+
 `POST /links` accepts free-text tag names alongside slugs. the server slugifies them and decides what each becomes: an existing tag applied, or a proposal queued for staff. proposing a name someone else has already proposed joins that proposal and returns the same response as creating one — a different answer would say whether a stranger had proposed the word.
 
 `GET /tags` never returns another user's pending proposal below staff, and no endpoint returns a count of the queue.

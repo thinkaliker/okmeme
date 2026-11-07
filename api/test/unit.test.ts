@@ -375,3 +375,29 @@ describe('permissions before the migration has run', () => {
     spy.mockRestore();
   });
 });
+
+describe('attribution of a post pinned below its author', () => {
+  it('names the author only to viewers at or above both the post and the author', async () => {
+    const { authorPayload } = await import('../src/serialize.js');
+    const { effectivePermissions } = await import('../src/permissions.js');
+    const viewerAt = (tier: number) =>
+      ({ tier, user: null, permissions: effectivePermissions(tier, new Map()) }) as never;
+    // An admin's post, pinned down to limited.
+    const row = {
+      effective_tier: TIER.limited,
+      author_tier: TIER.admin,
+      author_public_id: 'u_admin',
+      author_username: 'root',
+    } as never;
+
+    expect(authorPayload(viewerAt(TIER.anonymous), row)).toEqual({ kind: 'tier', label: 'limited' });
+    expect(authorPayload(viewerAt(TIER.limited), row)).toEqual({ kind: 'tier', label: 'full' });
+    expect(authorPayload(viewerAt(TIER.staff), row)).toEqual({ kind: 'tier', label: 'admin' });
+    expect(authorPayload(viewerAt(TIER.admin), row)).toEqual({ kind: 'user', id: 'u_admin', name: 'root' });
+
+    // Pinned *up* above a limited author: the old rule, unchanged.
+    const up = { effective_tier: TIER.full, author_tier: TIER.limited, author_public_id: 'u_l', author_username: 'dana' } as never;
+    expect(authorPayload(viewerAt(TIER.limited), up)).toEqual({ kind: 'tier', label: 'full' });
+    expect(authorPayload(viewerAt(TIER.full), up)).toMatchObject({ kind: 'user', name: 'dana' });
+  });
+});

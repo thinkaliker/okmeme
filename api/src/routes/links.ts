@@ -22,7 +22,7 @@ import { singleLink } from '../services/linkpage.js';
 import { thumbnailsEnabled } from '../services/settings.js';
 import { resolveTagIds } from '../services/tags.js';
 import { unfurl } from '../services/unfurl.js';
-import { findVisibleDuplicate, findVisibleLink } from '../visibility.js';
+import { findVisibleDuplicate, findVisibleLink, standingTier } from '../visibility.js';
 
 const submitSchema = z.object({
   kind: z.enum(['link', 'text', 'media']),
@@ -33,6 +33,13 @@ const submitSchema = z.object({
   tagSlugs: z.array(z.string()).max(10).optional().default([]),
   newTagNames: z.array(z.string()).max(10).optional().default([]),
   isNsfw: z.boolean().optional().default(false),
+  /**
+   * The tier the post lives at, when the author wants a wider audience than
+   * their own tier's. Absent or null follows the author, as every post always
+   * has. Never above the author: that would let them post under a higher
+   * tier's label.
+   */
+  pinnedTier: z.number().int().min(TIER.limited).max(TIER.admin).nullable().optional().default(null),
 });
 
 const patchSchema = z.object({
@@ -165,6 +172,16 @@ export function linkRoutes(): Hono<AppEnv> {
     if (draft.isNsfw && !viewer.permissions.has('postNsfw')) {
       throw forbidden('this tier cannot mark posts nsfw');
     }
+    // Posting at your own tier is the default, not a pin: it keeps following
+    // you if you are promoted, like every other post.
+    const pinnedTier = draft.pinnedTier === null || draft.pinnedTier === user.tier ? null : draft.pinnedTier;
+    if (pinnedTier !== null && pinnedTier > user.tier) {
+      throw forbidden('a post cannot live above its author');
+    }
+    if (pinnedTier !== null && !viewer.permissions.has('postBelow')) {
+      throw forbidden('this tier cannot post to a lower tier');
+    }
+
     if (draft.kind !== 'text' && draft.url.trim() === '') {
       throw invalid('a link needs a url', 'missing_url');
     }
@@ -220,8 +237,10 @@ export function linkRoutes(): Hono<AppEnv> {
           faviconKey,
           categoryId: category.id,
           authorId: user.id,
-          // Audit only. Visibility reads the author's *current* tier.
+          // Audit only. Visibility reads the author's *current* tier, unless
+          // they chose a lower one here.
           authorTierAtPost: user.tier,
+          pinnedTier,
           isNsfw: draft.isNsfw,
         },
       });
@@ -255,7 +274,7 @@ export function linkRoutes(): Hono<AppEnv> {
     if (row === null) throw notFound('no such link');
 
     const mine = row.author_id === user.id;
-    const asModerator = !mine && mayModerate(viewer, row.effective_tier);
+    const asModerator = !mine && mayModerate(viewer, standingTier(row));
     if (!mine && !asModerator) throw notFound('no such link');
     // The post is theirs and they can see it, so a 403 confirms nothing new.
     if (mine && !viewer.permissions.has('editOwn')) {
@@ -392,7 +411,7 @@ export function linkRoutes(): Hono<AppEnv> {
     if (row === null) throw notFound('no such link');
 
     const mine = row.author_id === user.id;
-    const asModerator = !mine && mayModerate(viewer, row.effective_tier);
+    const asModerator = !mine && mayModerate(viewer, standingTier(row));
     if (!mine && !asModerator) throw notFound('no such link');
 
     const reasonKey = c.req.query('reason') ?? null;

@@ -101,10 +101,46 @@ describe('the rest of the predicate', () => {
   it('honours a moderator re-tier over the author current tier', async () => {
     await loginAs('dana'); // limited
     const page = await feed();
-    // Authored by a full user, pinned to limited: visible, and by name.
+    // Authored by a full user, pinned to limited: visible — but not by name.
+    // The pin moves the post down, not its author: a name shown here would be
+    // a full user's identity crossing into limited, the handle the ring forbids.
     const pinned = page.items.find((item) => item.publicId === 'l_0jj88j');
     expect(pinned).toBeDefined();
-    expect(pinned?.author.kind).toBe('user');
+    expect(pinned?.author).toEqual({ kind: 'tier', label: 'full' });
+
+    await loginAs('sandra'); // full: the author's own tier, so by name
+    const asFull = (await feed()).items.find((item) => item.publicId === 'l_0jj88j');
+    expect(asFull?.author.kind).toBe('user');
+  });
+
+  it('lets an author post to a lower tier, never above, and keeps their name to themselves', async () => {
+    const draft = (pinnedTier: number | null) => ({
+      kind: 'text', title: `posted at ${pinnedTier}`, url: '', body: 'body', categorySlug: 'tech',
+      tagSlugs: [], newTagNames: [], isNsfw: false, pinnedTier,
+    });
+    const status = (promise: Promise<unknown>) =>
+      promise.then(() => 201, (error: { status: number }) => error.status);
+
+    await loginAs('sandra'); // full: postBelow is staff and up by default
+    expect(await status(api.request('POST', '/links', { body: draft(1) }))).toBe(403);
+    await loginAs('pip'); // staff
+    expect(await status(api.request('POST', '/links', { body: draft(4) }))).toBe(403);
+
+    await loginAs('root'); // admin, posting all the way down
+    const posted = await api.request<Link>('POST', '/links', { body: draft(1) });
+    expect(posted.author.kind).toBe('user');
+
+    const authorFor = async (username: string | null) => {
+      await loginAs(username);
+      return (await api.request<Link>('GET', `/links/${posted.publicId}`)).author;
+    };
+    expect(await authorFor(null)).toEqual({ kind: 'tier', label: 'limited' });
+    expect(await authorFor('dana')).toEqual({ kind: 'tier', label: 'full' });
+    expect(await authorFor('pip')).toEqual({ kind: 'tier', label: 'admin' });
+
+    // Staff see it, cannot moderate it: its author stands above them.
+    await loginAs('pip');
+    expect((await api.request<Link>('GET', `/links/${posted.publicId}`)).viewerCan.moderate).toBe(false);
   });
 
   it('never sends nsfw rows to a limited viewer', async () => {

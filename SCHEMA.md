@@ -76,7 +76,7 @@ a partial unique index on `(user_id) WHERE resolved_at IS NULL` permits one open
 | `category_id` | bigint fk categories | exactly one |
 | `author_id` | bigint fk users | |
 | `author_tier_at_post` | smallint | audit only, never queried for visibility |
-| `pinned_tier` | smallint null | set by moderator re-tier, or on author deletion |
+| `pinned_tier` | smallint null | set by moderator re-tier, by an author posting below their own tier, or on author deletion |
 | `is_nsfw` | boolean | |
 | `created_at` / `edited_at` | timestamptz | |
 | `removed_at` | timestamptz null | soft delete |

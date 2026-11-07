@@ -5,10 +5,11 @@ import { ApiError } from '@/api/client';
 import { TagPicker } from '@/components/TagPicker';
 import { Button } from '@/components/ui/button';
 import { FieldHint, Input, Label, Select, Textarea } from '@/components/ui/field';
+import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import type { Category, LinkKind, PreviewResult, Tag } from '@/domain/link';
-import { TIER } from '@/domain/tier';
-import { t } from '@/i18n/t';
+import { AUTHOR_TIER_LABELS, TIER } from '@/domain/tier';
+import { t, tierLabel } from '@/i18n/t';
 import { useSession } from '@/session/SessionProvider';
 
 const KINDS: readonly LinkKind[] = ['link', 'text', 'media'];
@@ -31,6 +32,8 @@ export default function SubmitRoute() {
   const [tagSlugs, setTagSlugs] = useState<readonly string[]>([]);
   const [newTagNames, setNewTagNames] = useState<readonly string[]>([]);
   const [isNsfw, setIsNsfw] = useState(false);
+  /** null follows the author's own tier, which is what every post did before. */
+  const [pinnedTier, setPinnedTier] = useState<number | null>(null);
 
   const [categories, setCategories] = useState<readonly Category[]>([]);
   const [tags, setTags] = useState<readonly Tag[]>([]);
@@ -95,6 +98,7 @@ export default function SubmitRoute() {
         tagSlugs,
         newTagNames,
         isNsfw,
+        pinnedTier,
       });
       navigate(`/l/${created.publicId}`);
     } catch (cause) {
@@ -213,6 +217,10 @@ export default function SubmitRoute() {
         creates={allows('createTags')}
       />
 
+      {allows('postBelow') && tier > TIER.limited ? (
+        <VisibilityChoice own={tier} value={pinnedTier} onChange={setPinnedTier} />
+      ) : null}
+
       {allows('postNsfw') ? (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-3">
@@ -231,5 +239,65 @@ export default function SubmitRoute() {
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * Where the post lives: the author's own tier, or one below it for a wider
+ * audience. Never above — the server refuses that, since it would put the post
+ * under a higher tier's label.
+ *
+ * Each option is described by the lowest tier that can see the post, which is
+ * one below where it lives. Every label offered is at or below the author's own
+ * tier, so the choice teaches them nothing about the ring.
+ */
+function VisibilityChoice({
+  own,
+  value,
+  onChange,
+}: {
+  own: number;
+  value: number | null;
+  onChange: (next: number | null) => void;
+}) {
+  const levels: number[] = [];
+  for (let level = own; level >= TIER.limited; level -= 1) levels.push(level);
+
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="text-sm font-medium">{t('submit.visibility')}</legend>
+      <div className="flex flex-wrap gap-2">
+        {levels.map((level) => {
+          const lowest = AUTHOR_TIER_LABELS[level - 2];
+          const isDefault = level === own;
+          return (
+            <label
+              key={level}
+              className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm has-checked:border-primary has-checked:bg-accent"
+            >
+              <input
+                type="radio"
+                name="submit-visibility"
+                checked={isDefault ? value === null : value === level}
+                onChange={() => onChange(isDefault ? null : level)}
+                className="accent-primary"
+              />
+              {lowest === undefined ? (
+                t('submit.visibilityEveryone')
+              ) : (
+                <>
+                  <Badge variant="tier">{tierLabel(lowest)}</Badge>
+                  <span>{t('submit.visibilityAndUp')}</span>
+                </>
+              )}
+              {isDefault ? (
+                <span className="text-xs text-muted-foreground">{t('submit.visibilityDefault')}</span>
+              ) : null}
+            </label>
+          );
+        })}
+      </div>
+      <FieldHint>{t('submit.visibilityHelp')}</FieldHint>
+    </fieldset>
   );
 }

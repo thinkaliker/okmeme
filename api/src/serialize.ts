@@ -1,7 +1,7 @@
 import type { Viewer, ActiveSanction, ViewerUser } from './context.js';
 import { CAPABILITIES, mayModerate, type Capability } from './permissions.js';
 import { isIdentified, tierLabel } from './tier.js';
-import type { LinkRow, TagRow } from './visibility.js';
+import { standingTier, type LinkRow, type TagRow } from './visibility.js';
 
 /**
  * The wire shape. One rule dominates everything below:
@@ -20,11 +20,19 @@ export type AuthorPayload =
   | { kind: 'user'; id: string; name: string }
   | { kind: 'tier'; label: string };
 
+/**
+ * Named only when the viewer is at or above both the post and its author —
+ * `standingTier`. Otherwise the label is that standing, capped at one rung above
+ * the viewer: the most the ring lets them know. A limited viewer reading an
+ * admin's post pinned down to limited sees `[full]`, exactly as they would for
+ * any other post from above, and never the admin's name.
+ */
 export function authorPayload(viewer: Viewer, row: LinkRow): AuthorPayload {
-  if (isIdentified(viewer.tier, row.effective_tier) && row.author_username !== null) {
+  const standing = standingTier(row);
+  if (isIdentified(viewer.tier, standing) && row.author_username !== null) {
     return { kind: 'user', id: row.author_public_id, name: row.author_username };
   }
-  return { kind: 'tier', label: tierLabel(row.effective_tier) };
+  return { kind: 'tier', label: tierLabel(Math.min(standing, viewer.tier + 1)) };
 }
 
 /** Resolves any user reference — proposers, appellants — through the same rule. */
@@ -82,7 +90,7 @@ export function viewerCan(viewer: Viewer, row: LinkRow): ViewerCanPayload {
   const muted = viewer.sanction !== null && viewer.sanction.types.includes('mute');
   const live = row.removed_at === null;
   const mine = row.author_id === user.id;
-  const moderate = !mine && mayModerate(viewer, row.effective_tier);
+  const moderate = !mine && mayModerate(viewer, standingTier(row));
 
   return {
     edit: live && !muted && ((mine && viewer.permissions.has('editOwn')) || moderate),

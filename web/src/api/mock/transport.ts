@@ -238,6 +238,11 @@ function effectiveTierOf(row: Row): EffectiveTier {
   return effectiveTier(row.pinnedTier ?? authorOf(row).tier);
 }
 
+/** `standingTier` on the server: never lower than where the author really is. */
+function standingOf(row: Row): EffectiveTier {
+  return effectiveTier(Math.max(effectiveTierOf(row), authorOf(row).tier));
+}
+
 const TIER_LABEL_BY_ORDINAL: Readonly<Record<number, AuthorTierLabel>> = {
   [TIER.limited]: 'limited',
   [TIER.full]: 'full',
@@ -252,13 +257,16 @@ const TIER_LABEL_BY_ORDINAL: Readonly<Record<number, AuthorTierLabel>> = {
  * object at all. Above that, the row never reaches this function.
  */
 function resolveAuthor(viewer: ViewerTier, row: Row): Author {
-  const effective = effectiveTierOf(row);
-  if (isIdentified(viewer, effective)) {
+  // Named only at or above both the post and its author, so a post pinned
+  // below its author never hands their name to the tiers it was pinned to.
+  const standing = standingOf(row);
+  if (isIdentified(viewer, standing)) {
     const user = authorOf(row);
     return { kind: 'user', id: user.publicId, name: user.username };
   }
-  const label = TIER_LABEL_BY_ORDINAL[effective];
-  if (label === undefined) throw new Error(`no label for tier ${effective}`);
+  const shown = Math.min(standing, viewer + 1);
+  const label = TIER_LABEL_BY_ORDINAL[shown];
+  if (label === undefined) throw new Error(`no label for tier ${shown}`);
   return { kind: 'tier', label };
 }
 
@@ -332,7 +340,7 @@ function viewerCanFor(row: Row): ViewerCan {
   const muted = sanctionFor(user)?.types.includes('mute') ?? false;
   const live = row.removedAt === null;
   const mine = row.authorId === user.id;
-  const moderate = !mine && mayModerate({ tier: user.tier, permissions }, effectiveTierOf(row));
+  const moderate = !mine && mayModerate({ tier: user.tier, permissions }, standingOf(row));
   return {
     edit: live && !muted && ((mine && permissions.has('editOwn')) || moderate),
     remove: live && !muted && (mine || moderate),
@@ -611,6 +619,14 @@ function submit(draft: SubmitDraft): Link {
   if (draft.isNsfw && !allows('postNsfw')) {
     throw new ApiError(403, 'forbidden', 'this tier cannot mark posts nsfw');
   }
+  const pinned = draft.pinnedTier ?? null;
+  const pinnedTier = pinned === null || pinned === user.tier ? null : pinned;
+  if (pinnedTier !== null && pinnedTier > user.tier) {
+    throw new ApiError(403, 'forbidden', 'a post cannot live above its author');
+  }
+  if (pinnedTier !== null && !allows('postBelow')) {
+    throw new ApiError(403, 'forbidden', 'this tier cannot post to a lower tier');
+  }
 
   const proposed = resolveNewTags(draft.newTagNames, user);
   const id = ++state.nextId;
@@ -623,6 +639,7 @@ function submit(draft: SubmitDraft): Link {
     ...(draft.kind === 'media' ? { mediaType: 'image' as const } : {}),
     ...(draft.body ? { body: draft.body } : {}),
     authorId: user.id,
+    ...(pinnedTier === null ? {} : { pinnedTier: pinnedTier as TierOrdinal }),
     categorySlug: draft.categorySlug,
     tagSlugs: [...new Set([...draft.tagSlugs, ...proposed])],
     isNsfw: draft.isNsfw,
@@ -855,7 +872,7 @@ function handle(method: Method, path: string, options: RequestOptions): unknown 
       }
       const row = findRow(publicId);
       const mine = row.authorId === user.id;
-      const asModerator = !mine && mayModerate({ tier: user.tier, permissions: viewerPermissions() }, effectiveTierOf(row));
+      const asModerator = !mine && mayModerate({ tier: user.tier, permissions: viewerPermissions() }, standingOf(row));
       if (!mine && !asModerator) throw new ApiError(404, 'not_found', 'no such link');
       const replaceRow = (next: Row) => {
         state.rows = state.rows.map((candidate) => (candidate.publicId === publicId ? next : candidate));

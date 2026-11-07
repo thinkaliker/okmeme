@@ -68,6 +68,19 @@ consequences to design around:
 - feed pages therefore cannot be cached across a tier change. cache keys include the viewer tier, ttls stay short, and any tier change invalidates them.
 - a moderator re-tier writes `pinned_tier`, which freezes that post permanently; the author's later movements no longer affect it.
 - a deleted account's posts are pinned at their last effective tier, so the join has something to resolve against.
+- an author may post *below* their own tier, for a wider audience, which writes `pinned_tier` the same way. never above it: a post living above its author would carry a higher tier's label, which is impersonating a rung. who may do it is the `postBelow` permission — staff and admin by default.
+
+### a pin moves the post, not its author
+
+`effective_tier` decides who may *see* a post. it does not decide who may see its author's *name*. that follows the author's **standing** on the post:
+
+```sql
+standing = GREATEST(effective_tier, author.tier)
+```
+
+a viewer is shown the name only when `standing <= viewer.tier`, and otherwise the label `min(standing, viewer.tier + 1)` — at most one rung up, like every other label. an admin's post pinned down to limited is visible to limited users as `[full]`, exactly like any other post from above them, and to anonymous visitors as `[limited]`. without this, every pin below an author would hand their real username to each tier it reached: a persistent identity crossing the tier wall, which is the one thing [author identity](#author-identity) rules out.
+
+moderation reads the same standing, so a post pinned down is still only editable by someone above its author — never sideways or up.
 
 ## nsfw
 
@@ -105,6 +118,7 @@ configurable, with the lowest tier each may reach:
 | --- | --- | --- |
 | post, vote, bookmark | limited–admin | limited |
 | edit own posts | limited–admin | limited |
+| post to a lower tier | staff–admin | full — limited has no tier below it |
 | mark posts nsfw | full–admin | full — limited never receives nsfw rows, so could not see its own post |
 | create tags without review | staff–admin | limited |
 | edit and remove lower tiers' posts | staff–admin | full — and only ever strictly below the moderator's own tier |

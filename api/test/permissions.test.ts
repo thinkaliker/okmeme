@@ -174,6 +174,30 @@ describe.skipIf(!enabled)('permissions', () => {
     expect((await set('admin', TIER.full, 'moderate', false)).status).toBe(200);
   });
 
+  it('lets an admin post to a lower tier, never above, and keeps their name to themselves', async () => {
+    const draft = (pinnedTier: number | null) => ({
+      kind: 'text', title: `at ${pinnedTier}`, body: 'body', categorySlug: 'misc', pinnedTier,
+    });
+    expect((await call('member', 'POST', '/links', draft(TIER.limited))).status).toBe(403);
+    expect((await call('staffer', 'POST', '/links', draft(TIER.admin))).status).toBe(403);
+
+    const posted = await call('admin', 'POST', '/links', draft(TIER.limited));
+    expect(posted.status).toBe(201);
+    const { publicId: id } = (await posted.json()) as { publicId: string };
+
+    const author = async (as: string) =>
+      ((await (await call(as, 'GET', `/links/${id}`)).json()) as { author: unknown }).author;
+    expect(await author('newbie')).toEqual({ kind: 'tier', label: 'full' });
+    expect(await author('staffer')).toEqual({ kind: 'tier', label: 'admin' });
+    expect(await author('admin')).toMatchObject({ kind: 'user', name: 'admin' });
+
+    // Staff can see it but not moderate it: the author stands above them.
+    const asStaff = (await (await call('staffer', 'GET', `/links/${id}`)).json()) as {
+      viewerCan: { moderate: boolean };
+    };
+    expect(asStaff.viewerCan.moderate).toBe(false);
+  });
+
   it('honours a revoked editOwn without hiding the post', async () => {
     expect((await set('admin', TIER.limited, 'editOwn', false)).status).toBe(200);
     expect((await call('newbie', 'PATCH', `/links/${postId}`, { title: 'mine' })).status).toBe(403);

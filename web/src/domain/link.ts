@@ -151,6 +151,12 @@ export interface SubmitDraft {
    */
   readonly newTagNames: readonly string[];
   readonly isNsfw: boolean;
+  /**
+   * A lower tier for the post to live at, for a wider audience. Absent or null
+   * follows the author's own tier. Never above it — the server refuses that.
+   * Tiers it reaches below the author see a tier label, never the author's name.
+   */
+  readonly pinnedTier?: number | null;
 }
 
 /**
