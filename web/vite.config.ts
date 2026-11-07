@@ -18,11 +18,12 @@ export default defineConfig({
   },
   build: {
     // route-level code splitting is driven by React.lazy in src/router.tsx;
-    // this only keeps the vendor churn out of the route chunks.
-    rollupOptions: {
+    // this only keeps the vendor churn out of the route chunks. A group pulls
+    // in what its matches import (scheduler, react-router) by default.
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          react: ['react', 'react-dom', 'react-router-dom'],
+        codeSplitting: {
+          groups: [{ name: 'react', test: /node_modules[\\/](react|react-dom|react-router-dom)[\\/]/ }],
         },
       },
     },
