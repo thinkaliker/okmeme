@@ -207,7 +207,7 @@ GET    /l/:public_id                     html, generic og card only
 
 `/thumb/:key` re-fetches from the source url on a cache miss and stores the derivative. the fetch is always server-side; a viewer's browser never touches a third-party host.
 
-thumbnails and favicons are switched separately. with thumbnails off — `BLOB_STORE=none`, or `settings.thumbnails_enabled` false — `thumbKey` comes back null on every link and `/thumb/th_*` 404s. with favicons off — `BLOB_STORE=none`, or `settings.favicons_enabled` anything but `true`, which is the default — `faviconKey` comes back null on every link and `/thumb/fav_*` 404s. either 404 is identical to one for a key that never existed. there is no field telling a client the instance has them disabled, and no url pointing anywhere else: a client with no key draws nothing in its place.
+with thumbnails off — `BLOB_STORE=none`, or `settings.thumbnails_enabled` false — `thumb_key` and `favicon_key` come back null on every link and `/thumb/:key` 404s for every key, identically to one that never existed. there is no field telling a client the instance has them disabled, and no url pointing anywhere else: a client that cannot resolve an image draws nothing in its place, as it already does for a link whose target has no preview or icon.
 
 ### health
 

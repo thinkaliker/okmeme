@@ -5,7 +5,8 @@ import type { Blob, BlobStore } from './index.js';
  *
  * For an instance that has nowhere free to put bytes, or does not want the
  * outbound fetch. Nothing is stored and nothing is served, so every link renders
- * the way the client already draws one whose target has no preview image.
+ * the way the client already draws one whose target has no preview image or
+ * icon.
  *
  * What this must never become is a fallback to the source URL. Hotlinking a
  * third-party image hands every viewer's IP to whoever hosts it, and in a tiered

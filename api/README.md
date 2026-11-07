@@ -135,8 +135,7 @@ node dist/cli.js prune-rate-limits
 
 **Thumbnails** are switchable. `BLOB_STORE=none` means there is nowhere to keep
 bytes; `settings.thumbnails_enabled` means an instance that has somewhere would
-rather not. **Favicons** have their own switch, `settings.favicons_enabled`,
-which is off unless an admin turns it on. Either off means off, so an admin cannot enable what the deployment
+rather not. Either off means off, so an admin cannot enable what the deployment
 cannot serve. `okmeme init --no-thumbnails` sets it at install, the admin
 settings panel flips it afterwards, and posts made while it was off need one
 command, because a key is written at submission and nothing revisits old rows:

@@ -160,8 +160,6 @@ interface State {
   invites: AdminInvite[];
   /** Overridden cells of the permission table, per tier. Absent means default. */
   permissionOverrides: Map<number, Map<Capability, boolean>>;
-  /** `settings.favicons_enabled`. Off by default, as on a real instance. */
-  faviconsEnabled: boolean;
   nextId: number;
 }
 
@@ -180,7 +178,6 @@ const state: State = {
   categories: [...MOCK_CATEGORIES],
   invites: seedInvites(),
   permissionOverrides: new Map(),
-  faviconsEnabled: false,
   nextId: 1000,
 };
 
@@ -330,14 +327,11 @@ function tagsOf(slugs: readonly string[], row: Row, viewer: ViewerTier): Tag[] {
 }
 
 /**
- * Stands in for "the fetcher found an icon at submission time". Null for every
- * host while `favicons_enabled` is off, as the real serializer sends. With it
- * on, deterministic so a given host behaves the same on every reload, and
- * deliberately not universal so a row with no icon is visible in the feed
- * rather than only in a test.
+ * Stands in for "the fetcher found an icon at submission time". Deterministic so
+ * a given host behaves the same on every reload, and deliberately not universal
+ * so a row with no icon is visible in the feed rather than only in a test.
  */
 function faviconKeyFor(host: string): string | null {
-  if (!state.faviconsEnabled) return null;
   return host.length % 4 === 0 ? null : `fav_${host}`;
 }
 
@@ -1179,17 +1173,12 @@ function handle(method: Method, path: string, options: RequestOptions): unknown 
     return null;
   }
 
-  if (path === '/admin/settings' && (method === 'GET' || method === 'PATCH')) {
+  if (method === 'GET' && path === '/admin/settings') {
     if (currentTier() < TIER.admin) throw new ApiError(403, 'forbidden', 'admin only');
-    // Only the favicon switch is live in the mock; the rest are display rows.
-    const patch = method === 'PATCH' ? ((options.body ?? {}) as Record<string, unknown>) : {};
-    if ('favicons_enabled' in patch) state.faviconsEnabled = patch['favicons_enabled'] === true;
     return {
       items: [
-        { key: 'favicons_enabled', value: state.faviconsEnabled, minWriterTier: 4, updatedAt: isoFromMinutes(0) },
         { key: 'instance_name', value: 'okmeme', minWriterTier: 4, updatedAt: isoFromMinutes(0) },
         { key: 'invite_min_tier', value: 4, minWriterTier: 5, updatedAt: isoFromMinutes(0) },
-        { key: 'thumbnails_enabled', value: true, minWriterTier: 4, updatedAt: isoFromMinutes(0) },
       ],
     };
   }

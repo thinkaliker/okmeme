@@ -171,6 +171,14 @@ describe('LinkCard', () => {
     expect(screen.queryByText('E')).toBeNull();
   });
 
+  it('drops a favicon that fails to load rather than showing a broken image', () => {
+    const { container } = renderCard({ ...aboveTierLink, faviconKey: 'fav_example.org' });
+    const icon = container.querySelector('img');
+    expect(icon).not.toBeNull();
+    if (icon !== null) fireEvent.error(icon);
+    expect(container.querySelector('img')).toBeNull();
+  });
+
   it('keeps the icons out of the heading so a long title cannot wrap under them', () => {
     renderCard({
       ...aboveTierLink,

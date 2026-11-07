@@ -1,7 +1,6 @@
 import type { Viewer } from '../context.js';
 import { toPage, type Page } from '../lib/cursor.js';
 import { groupTags, linkPayload } from '../serialize.js';
-import { mediaSwitches } from './settings.js';
 import { queryLinks, tagsForLinks, type LinkQuery, type LinkRow } from '../visibility.js';
 
 /**
@@ -16,12 +15,11 @@ export async function linksPage(query: LinkQuery): Promise<Page<Record<string, u
   const visible = rows.slice(0, query.limit);
   const tags = await tagsForLinks(query.viewer, visible.map((row) => row.id));
   const byLink = groupTags(tags);
-  const media = await mediaSwitches();
 
   return toPage(
     rows,
     query.limit,
-    (row: LinkRow) => linkPayload(query.viewer, row, byLink.get(String(row.id)) ?? [], media),
+    (row: LinkRow) => linkPayload(query.viewer, row, byLink.get(String(row.id)) ?? []),
     (row: LinkRow) => ({ rank: Number(row.rank), id: Number(row.id) }),
   );
 }
@@ -31,5 +29,5 @@ export async function singleLink(
   row: LinkRow,
 ): Promise<Record<string, unknown>> {
   const tags = await tagsForLinks(viewer, [row.id]);
-  return linkPayload(viewer, row, tags, await mediaSwitches());
+  return linkPayload(viewer, row, tags);
 }

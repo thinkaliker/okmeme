@@ -51,12 +51,12 @@ function KindIcon({ link }: { link: Link }) {
 }
 
 /**
- * The site's icon when the server sent one, and nothing at all when it did not.
- *
- * Favicons are an instance setting (`favicons_enabled`), off by default, and
- * with it off every `faviconKey` arrives null. There is deliberately no
- * stand-in: a letter square in a monospace face read as a number — an "O" for
- * a host starting with o looked like a score of 0 next to the title.
+ * The site's icon when the server has one, and nothing at all when it does not
+ * — the site had none at submission, or the instance has thumbnails off, which
+ * covers favicons too. There is deliberately no stand-in: a letter square in a
+ * monospace face read as a number — an "O" for a host starting with o looked
+ * like a score of 0 next to the title. An icon that fails to load is dropped
+ * the same way rather than left as a broken-image glyph.
  *
  * Decorative — the host is spelled out next to the title — so it is hidden from
  * assistive tech rather than given an alt text that repeats it.
@@ -67,8 +67,9 @@ function KindIcon({ link }: { link: Link }) {
  * the readers of a tier it cannot see.
  */
 function Favicon({ faviconKey }: { faviconKey: string | null }) {
+  const [failed, setFailed] = useState(false);
   const src = faviconUrl(faviconKey);
-  if (src === null) return null;
+  if (src === null || failed) return null;
 
   return (
     <img
@@ -80,6 +81,7 @@ function Favicon({ faviconKey }: { faviconKey: string | null }) {
       loading="lazy"
       decoding="async"
       referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
       className="size-4 shrink-0 rounded-[3px] object-cover"
     />
   );

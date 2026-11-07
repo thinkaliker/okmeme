@@ -98,8 +98,8 @@ evicted the next request refetches it, because a key is derived from the link
 rather than random.
 
 **Or run without them: `BLOB_STORE=none`.** Nothing is fetched, nothing is
-stored, and every link renders the way a link whose target has no preview image
-already does. You can also
+stored, and every link renders without a preview image or site icon — the same
+thing a link whose target has neither already shows. You can also
 say no during setup with a blob store configured, which sets
 `thumbnails_enabled` to false and leaves the store waiting.
 
@@ -112,11 +112,6 @@ say no during setup with a blob store configured, which sets
 
 Turning them on later is [Settings → `thumbnails_enabled`](#changing-your-mind-about-thumbnails)
 in the admin panel, plus one command for the posts made in the meantime.
-
-Site icons (favicons) are a separate setting, `favicons_enabled`, and start
-**off** on every instance. Setup does not ask about them; turn them on under
-**Admin → Settings** if you want them. They need a blob store, the same as
-thumbnails.
 
 ### Things to generate now
 
@@ -1008,14 +1003,6 @@ next submission. Images already in the store stay there and stop being served �
 delete them at the provider if you want the space back, and note that the keys
 in `links.thumb_key` remain, so turning it back on restores those posts with no
 backfill needed.
-
-**Favicons** work the same way under their own setting, `favicons_enabled`,
-which is `false` until you change it. Set it to `true` to start fetching site
-icons at submission; `backfill-thumbs` fills in favicons for older posts too,
-whenever the setting is on. Turning it off hides them at once and keeps the
-keys, so turning it back on restores them. On an instance that fetched favicons
-before this setting existed, they stop showing after the migration until you
-turn it on.
 
 ### Housekeeping
 

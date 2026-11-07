@@ -19,7 +19,7 @@ import {
 import { deriveAtSubmit } from '../services/media.js';
 import { notify } from '../services/notify.js';
 import { singleLink } from '../services/linkpage.js';
-import { mediaSwitches } from '../services/settings.js';
+import { thumbnailsEnabled } from '../services/settings.js';
 import { resolveTagIds } from '../services/tags.js';
 import { unfurl } from '../services/unfurl.js';
 import { findVisibleDuplicate, findVisibleLink, standingTier } from '../visibility.js';
@@ -203,13 +203,11 @@ export function linkRoutes(): Hono<AppEnv> {
     const linkPublicId = publicId('l');
 
     // The fetch happens once, here, and never from a viewer's browser. With
-    // thumbnails and favicons both off there is nothing to fetch it for, so the
-    // request is not made at all and the submitter's fetch budget is not spent
-    // on it.
+    // thumbnails off there is nothing to fetch it for, so the request is not
+    // made at all and the submitter's fetch budget is not spent on it.
     let thumbKey: string | null = null;
     let faviconKey: string | null = null;
-    const media = await mediaSwitches();
-    if (canonical !== null && (media.thumbnails || media.favicons)) {
+    if (canonical !== null && (await thumbnailsEnabled())) {
       await limit(BUCKETS.fetch, viewer);
       const meta = await unfurl(canonical);
       const derived = await deriveAtSubmit(
