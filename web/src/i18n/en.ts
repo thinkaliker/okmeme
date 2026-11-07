@@ -335,6 +335,8 @@ export const en = {
   'admin.ownerOnly': 'owner only',
   'admin.save': 'Save',
   'admin.invalidJson': 'That is not valid JSON.',
+  'admin.invalidNumber': 'Enter a number.',
+  'admin.invalidInteger': 'Enter a whole number.',
   'admin.cancel': 'Cancel',
 
   'admin.tierLegendTitle': 'Tiers — a higher number means more access',

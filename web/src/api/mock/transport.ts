@@ -8,7 +8,7 @@ import {
   type MockLink,
   type MockUser,
 } from '@/api/mock/data';
-import type { AdminInvite } from '@/domain/admin';
+import type { AdminInvite, InstanceSetting } from '@/domain/admin';
 import type { Author } from '@/domain/author';
 import type { Category, Link, LinkPatch, PreviewResult, SubmitDraft, Tag, TagProposal } from '@/domain/link';
 import {
@@ -160,6 +160,8 @@ interface State {
   invites: AdminInvite[];
   /** Overridden cells of the permission table, per tier. Absent means default. */
   permissionOverrides: Map<number, Map<Capability, boolean>>;
+  /** The settings table, with the real keys and the types they really hold. */
+  settings: InstanceSetting[];
   nextId: number;
 }
 
@@ -178,6 +180,14 @@ const state: State = {
   categories: [...MOCK_CATEGORIES],
   invites: seedInvites(),
   permissionOverrides: new Map(),
+  settings: [
+    { key: 'instance_name', value: 'okmeme', minWriterTier: 4, updatedAt: isoFromMinutes(0) },
+    { key: 'invite_min_tier', value: 4, minWriterTier: 5, updatedAt: isoFromMinutes(0) },
+    { key: 'invite_ttl_days', value: 14, minWriterTier: 4, updatedAt: isoFromMinutes(0) },
+    { key: 'setup_complete', value: true, minWriterTier: 5, updatedAt: isoFromMinutes(0) },
+    { key: 'signup_open', value: false, minWriterTier: 4, updatedAt: isoFromMinutes(0) },
+    { key: 'thumbnails_enabled', value: true, minWriterTier: 4, updatedAt: isoFromMinutes(0) },
+  ],
   nextId: 1000,
 };
 
@@ -1173,14 +1183,23 @@ function handle(method: Method, path: string, options: RequestOptions): unknown 
     return null;
   }
 
-  if (method === 'GET' && path === '/admin/settings') {
+  if (path === '/admin/settings' && (method === 'GET' || method === 'PATCH')) {
     if (currentTier() < TIER.admin) throw new ApiError(403, 'forbidden', 'admin only');
-    return {
-      items: [
-        { key: 'instance_name', value: 'okmeme', minWriterTier: 4, updatedAt: isoFromMinutes(0) },
-        { key: 'invite_min_tier', value: 4, minWriterTier: 5, updatedAt: isoFromMinutes(0) },
-      ],
-    };
+    if (method === 'PATCH') {
+      const patch = (options.body ?? {}) as Record<string, unknown>;
+      for (const [key, value] of Object.entries(patch)) {
+        const index = state.settings.findIndex((setting) => setting.key === key);
+        const existing = state.settings[index];
+        // As the server: a key above the caller's tier is refused, not skipped.
+        if (existing !== undefined && currentTier() < existing.minWriterTier) {
+          throw new ApiError(403, 'forbidden', 'this setting requires a higher tier');
+        }
+        const next = { key, value, minWriterTier: existing?.minWriterTier ?? 4, updatedAt: isoFromMinutes(0) };
+        if (existing === undefined) state.settings.push(next);
+        else state.settings[index] = next;
+      }
+    }
+    return { items: [...state.settings].sort((a, b) => a.key.localeCompare(b.key)) };
   }
 
   if (method === 'GET' && path === '/owner/owners') {

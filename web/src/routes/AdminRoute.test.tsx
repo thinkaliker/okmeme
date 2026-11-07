@@ -165,3 +165,44 @@ describe('admin invites tab', () => {
     expect(revoked.queryByRole('button', { name: 'Revoke' })).toBeNull();
   });
 });
+
+describe('admin settings tab', () => {
+  it('edits each setting with an input that only takes its type', async () => {
+    await open('root', '/admin?tab=settings');
+
+    // A flag is a true/false choice, not a text box.
+    const thumbnails = await rowOf('thumbnails_enabled');
+    const flag = thumbnails.getByRole('combobox', { name: 'thumbnails_enabled' });
+    expect(within(flag).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'true',
+      'false',
+    ]);
+    expect((flag as HTMLSelectElement).value).toBe('true');
+    fireEvent.change(flag, { target: { value: 'false' } });
+    fireEvent.click(thumbnails.getByRole('button', { name: 'Save' }));
+    await waitFor(async () => {
+      const saved = (await rowOf('thumbnails_enabled')).getByRole('combobox');
+      expect((saved as HTMLSelectElement).value).toBe('false');
+    });
+
+    // A count is a number field, and a fraction is refused before it is sent.
+    const ttl = await rowOf('invite_ttl_days');
+    const days = ttl.getByRole('spinbutton', { name: 'invite_ttl_days' });
+    expect(days.getAttribute('type')).toBe('number');
+    fireEvent.change(days, { target: { value: '2.5' } });
+    fireEvent.click(ttl.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Enter a whole number.')).toBeDefined();
+    fireEvent.change(days, { target: { value: '7' } });
+    fireEvent.click(ttl.getByRole('button', { name: 'Save' }));
+    await waitFor(async () => {
+      const saved = (await rowOf('invite_ttl_days')).getByRole('spinbutton');
+      expect((saved as HTMLInputElement).value).toBe('7');
+    });
+    expect(screen.queryByText('Enter a whole number.')).toBeNull();
+
+    // Anything else stays raw JSON; an owner-only key is shown but not editable.
+    expect((await rowOf('instance_name')).getByRole('textbox', { name: 'instance_name' })).toBeDefined();
+    const minTier = (await rowOf('invite_min_tier')).getByRole('spinbutton', { name: 'invite_min_tier' });
+    expect(minTier.hasAttribute('disabled')).toBe(true);
+  });
+});

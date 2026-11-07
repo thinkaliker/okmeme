@@ -1496,6 +1496,103 @@ function Audit() {
 
 /* ---------------------------------------------------------------- settings */
 
+/**
+ * Settings are stored as JSON, so the input is chosen from the type of the
+ * value already there: a boolean gets true/false and nothing else, a number a
+ * number field, and anything else the raw JSON. The type of a setting is fixed
+ * by whoever created it, so a flag cannot be saved as the string "true".
+ */
+type SettingKind = 'boolean' | 'integer' | 'number' | 'json';
+
+function settingKind(value: unknown): SettingKind {
+  if (typeof value === 'boolean') return 'boolean';
+  if (typeof value === 'number') return Number.isInteger(value) ? 'integer' : 'number';
+  return 'json';
+}
+
+function settingDraft(value: unknown): string {
+  return settingKind(value) === 'json' ? JSON.stringify(value) : String(value);
+}
+
+function parseSetting(
+  raw: string,
+  kind: SettingKind,
+): { ok: true; value: unknown } | { ok: false; error: MessageKey } {
+  switch (kind) {
+    case 'boolean':
+      return raw === 'true' || raw === 'false'
+        ? { ok: true, value: raw === 'true' }
+        : { ok: false, error: 'admin.invalidJson' };
+    case 'integer':
+    case 'number': {
+      const value = Number(raw);
+      if (raw.trim() === '' || !Number.isFinite(value)) return { ok: false, error: 'admin.invalidNumber' };
+      if (kind === 'integer' && !Number.isInteger(value)) return { ok: false, error: 'admin.invalidInteger' };
+      return { ok: true, value };
+    }
+    case 'json':
+      try {
+        return { ok: true, value: JSON.parse(raw) as unknown };
+      } catch {
+        return { ok: false, error: 'admin.invalidJson' };
+      }
+  }
+}
+
+function SettingInput({
+  setting,
+  value,
+  disabled,
+  onChange,
+}: {
+  setting: InstanceSetting;
+  value: string;
+  disabled: boolean;
+  onChange: (next: string) => void;
+}) {
+  const kind = settingKind(setting.value);
+
+  if (kind === 'boolean') {
+    return (
+      <Select
+        aria-label={setting.key}
+        className="w-auto font-mono"
+        disabled={disabled}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </Select>
+    );
+  }
+
+  if (kind === 'integer' || kind === 'number') {
+    return (
+      <Input
+        type="number"
+        inputMode={kind === 'integer' ? 'numeric' : 'decimal'}
+        step={kind === 'integer' ? 1 : 'any'}
+        aria-label={setting.key}
+        className="w-32 font-mono"
+        disabled={disabled}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    );
+  }
+
+  return (
+    <Input
+      aria-label={setting.key}
+      className="font-mono"
+      disabled={disabled}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  );
+}
+
 function Settings({ viewerTier }: { viewerTier: number }) {
   const [items, setItems] = useState<readonly InstanceSetting[] | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -1508,21 +1605,25 @@ function Settings({ viewerTier }: { viewerTier: number }) {
       .catch(() => setItems([]));
   }, []);
 
-  async function save(key: string, fallback: unknown) {
+  async function save(key: string, current: unknown) {
     setError(null);
     const raw = draft[key];
-    let value: unknown = fallback;
+    let value: unknown = current;
     if (raw !== undefined) {
-      try {
-        value = JSON.parse(raw);
-      } catch {
-        setError(t('admin.invalidJson'));
+      const parsed = parseSetting(raw, settingKind(current));
+      if (!parsed.ok) {
+        setError(t(parsed.error));
         return;
       }
+      value = parsed.value;
     }
     try {
       const response = await admin.patchSettings({ [key]: value });
       setItems(response.items);
+      setDraft((drafts) => {
+        const { [key]: _saved, ...rest } = drafts;
+        return rest;
+      });
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : t('app.error'));
     }
@@ -1550,14 +1651,11 @@ function Settings({ viewerTier }: { viewerTier: number }) {
                 {writable ? null : <Badge variant="outline">{t('admin.ownerOnly')}</Badge>}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Input
-                  aria-label={setting.key}
-                  className="font-mono"
+                <SettingInput
+                  setting={setting}
                   disabled={!writable}
-                  value={draft[setting.key] ?? JSON.stringify(setting.value)}
-                  onChange={(event) =>
-                    setDraft((current) => ({ ...current, [setting.key]: event.target.value }))
-                  }
+                  value={draft[setting.key] ?? settingDraft(setting.value)}
+                  onChange={(next) => setDraft((current) => ({ ...current, [setting.key]: next }))}
                 />
                 <Button
                   size="sm"
