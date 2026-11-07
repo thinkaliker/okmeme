@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   },
   "bin": {
     "okmeme": "./dist/cli.js"
@@ -20,28 +20,27 @@
     "typecheck": "tsc -p tsconfig.check.json"
   },
   "dependencies": {
-    "@hono/node-server": "^1.14.0",
-    "@prisma/client": "^6.5.0",
+    "@hono/node-server": "^2.1.5",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
     "hash-wasm": "^4.12.0",
-    "hono": "^4.7.4",
-    "zod": "^3.24.2"
+    "hono": "^4.13.14",
+    "zod": "^4.6.6"
   },
   "optionalDependencies": {
     "@aws-sdk/client-s3": "^3.750.0",
-    "sharp": "^0.33.5"
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",
-    "prisma": "^6.5.0",
+    "prisma": "^7.10.1",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3",
-    "vitest": "^3.0.7"
+    "vitest": "^5.0.5"
   },
   "allowScripts": {
-    "@prisma/client@6.19.3": true,
-    "prisma@6.19.3": true,
-    "@prisma/engines@6.19.3": true,
     "esbuild@0.28.1": true,
-    "sharp@0.33.5": true
+    "prisma@7.10.1": true,
+    "@prisma/engines@7.10.1": true
   }
 }

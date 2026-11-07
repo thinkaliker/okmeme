@@ -11,9 +11,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// No `url`: Prisma 7 takes the connection from the driver adapter that
+// src/db.ts hands to the client. Nothing here runs Prisma Migrate, so the CLI
+// never needs one either.
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum UserState {
