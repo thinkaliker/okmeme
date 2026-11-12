@@ -10,7 +10,8 @@ import { cn } from '@/lib/utils';
  * - Field is content-sized: upstream's `w-full` on the field and on its
  *   children would put each field of a wrapping row on a line of its own;
  * - FieldSet is gap-2 and FieldLegend has no bottom margin, as the hand-rolled
- *   fieldsets were;
+ *   fieldsets were. Its size is a plain class rather than upstream's
+ *   `data-[variant=…]:text-*`, which a `className="text-xs"` could not override;
  * - FieldLabel keeps Label's leading-none, and a checked choice label is
  *   bg-accent, the same in both themes;
  * - FieldDescription is the old FieldHint: text-xs, no margin adjustments.
@@ -28,7 +29,7 @@ function FieldLegend({
     <legend
       data-slot="field-legend"
       data-variant={variant}
-      className={cn('font-medium', 'data-[variant=legend]:text-base', 'data-[variant=label]:text-sm', className)}
+      className={cn('font-medium', variant === 'label' ? 'text-sm' : 'text-base', className)}
       {...props}
     />
   );

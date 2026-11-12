@@ -7,6 +7,10 @@ import { cn } from '@/lib/utils';
  * shadcn new-york-v4 `radio-group`, without the dark-mode fill (as Input) and
  * without `outline-none` / a focus ring: the global :focus-visible outline is
  * the focus indicator.
+ *
+ * The border is muted-foreground (primary once checked), not upstream's
+ * border-input: an empty radio is drawn by its border alone, and --input is
+ * ~1.5:1 against the background, short of WCAG 1.4.11's 3:1. See checkbox.tsx.
  */
 function RadioGroup({ className, ...props }: ComponentProps<typeof RadioGroupPrimitive.Root>) {
   return <RadioGroupPrimitive.Root data-slot="radio-group" className={cn('grid gap-3', className)} {...props} />;
@@ -17,7 +21,7 @@ function RadioGroupItem({ className, ...props }: ComponentProps<typeof RadioGrou
     <RadioGroupPrimitive.Item
       data-slot="radio-group-item"
       className={cn(
-        'aspect-square size-4 shrink-0 rounded-full border border-input text-primary shadow-xs transition-[color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40',
+        'aspect-square size-4 shrink-0 rounded-full border border-muted-foreground text-primary shadow-xs data-[state=checked]:border-primary transition-[color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40',
         className,
       )}
       {...props}

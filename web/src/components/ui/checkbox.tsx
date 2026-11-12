@@ -7,13 +7,18 @@ import { cn } from '@/lib/utils';
  * shadcn new-york-v4 `checkbox`, without the dark-mode fill (as Input) and
  * without `outline-none` / a focus ring: the global :focus-visible outline is
  * the focus indicator.
+ *
+ * The unchecked border is muted-foreground, not upstream's border-input. An
+ * empty box is drawn by its border alone, and --input is ~1.5:1 against the
+ * background in both themes; muted-foreground clears the 3:1 that a control's
+ * boundary needs (WCAG 1.4.11), as the native checkboxes it replaced did.
  */
 function Checkbox({ className, ...props }: ComponentProps<typeof CheckboxPrimitive.Root>) {
   return (
     <CheckboxPrimitive.Root
       data-slot="checkbox"
       className={cn(
-        'peer size-4 shrink-0 rounded-[4px] border border-input shadow-xs transition-shadow disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground dark:aria-invalid:ring-destructive/40',
+        'peer size-4 shrink-0 rounded-[4px] border border-muted-foreground shadow-xs transition-shadow disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground dark:aria-invalid:ring-destructive/40',
         className,
       )}
       {...props}
