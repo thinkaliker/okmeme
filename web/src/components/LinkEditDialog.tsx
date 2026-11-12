@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Dialog } from 'radix-ui';
 import { Settings } from 'lucide-react';
 import { admin, links as linksApi, taxonomy } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { FieldHint } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -191,14 +200,14 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
   const nsfwLocked = !isNsfw && !allows('postNsfw');
 
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
       onOpenChange={(next) => {
         if (next) reset();
         setOpen(next);
       }}
     >
-      <Dialog.Trigger asChild>
+      <DialogTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
@@ -208,213 +217,212 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
         >
           <Settings />
         </Button>
-      </Dialog.Trigger>
+      </DialogTrigger>
 
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-popover p-5 text-popover-foreground shadow-lg">
-          <Dialog.Title className="text-base font-semibold">{t('linkEdit.title')}</Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+      <DialogContent showCloseButton={false} className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{t('linkEdit.title')}</DialogTitle>
+          <DialogDescription>
             {can.moderate ? t('linkEdit.moderating') : t('linkEdit.own')}
-          </Dialog.Description>
+          </DialogDescription>
+        </DialogHeader>
 
-          {can.edit || can.setTier ? (
-            <form
-              className="mt-4 flex flex-col gap-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (valid) void save();
-              }}
-            >
-              {can.edit ? (
-                <>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor={id('title')}>{t('linkEdit.postTitle')}</Label>
-                    <Input
-                      id={id('title')}
-                      value={title}
-                      maxLength={300}
-                      required
-                      onChange={(event) => setTitle(event.target.value)}
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor={id('body')}>{t('linkEdit.body')}</Label>
-                    <Textarea
-                      id={id('body')}
-                      value={body}
-                      maxLength={20_000}
-                      required={link.kind === 'text'}
-                      onChange={(event) => setBody(event.target.value)}
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor={id('category')}>{t('linkEdit.category')}</Label>
-                    <NativeSelect
-                      id={id('category')}
-                      value={categorySlug}
-                      onChange={(event) => setCategorySlug(event.target.value)}
-                    >
-                      {categoryOptions.map((category) => (
-                        <NativeSelectOption key={category.slug} value={category.slug}>
-                          {tOptional(category.nameKey, category.name)}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                  </div>
-
-                  <TagPicker
-                    id={id('tags')}
-                    available={tagOptions}
-                    slugs={tagSlugs}
-                    newNames={newTagNames}
-                    onSlugsChange={setTagSlugs}
-                    onNewNamesChange={setNewTagNames}
-                    creates={allows('createTags')}
-                    listClassName="max-h-32 overflow-y-auto"
-                  />
-
-                  {allows('postNsfw') || link.isNsfw ? (
-                    <div className="flex items-center gap-3">
-                      <Switch
-                        id={id('nsfw')}
-                        checked={isNsfw}
-                        disabled={nsfwLocked}
-                        onCheckedChange={setIsNsfw}
-                      />
-                      <Label htmlFor={id('nsfw')}>{t('linkEdit.nsfw')}</Label>
-                    </div>
-                  ) : null}
-                </>
-              ) : null}
-
-              {can.setTier ? (
-                <VisibilityChoice
-                  name={id('visibility')}
-                  own={own}
-                  value={tierChoice}
-                  onChange={setTierChoice}
-                  isDisabled={widenLocked}
-                  hint={allows('postBelow') ? t('submit.visibilityHelp') : t('linkEdit.visibilityNarrowOnly')}
-                />
-              ) : null}
-
-              <div className="flex justify-end gap-2">
-                <Dialog.Close asChild>
-                  <Button type="button" variant="ghost" size="sm">
-                    {t('app.cancel')}
-                  </Button>
-                </Dialog.Close>
-                <Button type="submit" size="sm" disabled={pending || !valid || !changed}>
-                  {t('app.save')}
-                </Button>
-              </div>
-            </form>
-          ) : null}
-
-          {can.remove || can.retier ? (
-            <section
-              aria-labelledby={id('moderation')}
-              className={cn('flex flex-col gap-4', (can.edit || can.setTier) && 'mt-5 border-t border-border pt-4')}
-            >
-              <h3 id={id('moderation')} className={cn('text-sm font-semibold', !can.edit && !can.setTier && 'mt-4')}>
-                {t('linkEdit.moderation')}
-              </h3>
-
-              {can.remove ? (
-                <div className="flex flex-col gap-2">
-                  {can.moderate ? (
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor={id('reason')}>{t('linkEdit.removeReason')}</Label>
-                      <NativeSelect id={id('reason')} value={reason} onChange={(event) => setReason(event.target.value)}>
-                        <NativeSelectOption value="">{t('linkEdit.removeNoReason')}</NativeSelectOption>
-                        {REMOVAL_REASONS.map((key) => (
-                          <NativeSelectOption key={key} value={key}>
-                            {t(key)}
-                          </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                      <FieldHint>{t('linkEdit.removeReasonHint')}</FieldHint>
-                    </div>
-                  ) : (
-                    <FieldHint>{t('linkEdit.removeOwnHint')}</FieldHint>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    {confirmRemove ? (
-                      <>
-                        <Button size="sm" variant="destructive" disabled={pending} onClick={() => void remove()}>
-                          {t('linkEdit.removeConfirm')}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(false)}>
-                          {t('app.cancel')}
-                        </Button>
-                      </>
-                    ) : (
-                      <Button size="sm" variant="outline" onClick={() => setConfirmRemove(true)}>
-                        {t('linkEdit.remove')}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-
-              {can.retier ? (
+        {can.edit || can.setTier ? (
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (valid) void save();
+            }}
+          >
+            {can.edit ? (
+              <>
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={id('pin')}>{t('linkEdit.retier')}</Label>
-                  <div className="flex gap-2">
-                    <NativeSelect
-                      id={id('pin')}
-                      value={pinTo}
-                      onChange={(event) => {
-                        setPinTo(event.target.value);
-                        setPinned(false);
-                      }}
-                    >
-                      <NativeSelectOption value="" disabled>
-                        {t('linkEdit.retierChoose')}
+                  <Label htmlFor={id('title')}>{t('linkEdit.postTitle')}</Label>
+                  <Input
+                    id={id('title')}
+                    value={title}
+                    maxLength={300}
+                    required
+                    onChange={(event) => setTitle(event.target.value)}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={id('body')}>{t('linkEdit.body')}</Label>
+                  <Textarea
+                    id={id('body')}
+                    value={body}
+                    maxLength={20_000}
+                    required={link.kind === 'text'}
+                    onChange={(event) => setBody(event.target.value)}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={id('category')}>{t('linkEdit.category')}</Label>
+                  <NativeSelect
+                    id={id('category')}
+                    value={categorySlug}
+                    onChange={(event) => setCategorySlug(event.target.value)}
+                  >
+                    {categoryOptions.map((category) => (
+                      <NativeSelectOption key={category.slug} value={category.slug}>
+                        {tOptional(category.nameKey, category.name)}
                       </NativeSelectOption>
-                      {PIN_TIERS.map((option) => (
-                        <NativeSelectOption key={option.tier} value={String(option.tier)}>
-                          {tierLabel(option.label)}
+                    ))}
+                  </NativeSelect>
+                </div>
+
+                <TagPicker
+                  id={id('tags')}
+                  available={tagOptions}
+                  slugs={tagSlugs}
+                  newNames={newTagNames}
+                  onSlugsChange={setTagSlugs}
+                  onNewNamesChange={setNewTagNames}
+                  creates={allows('createTags')}
+                  listClassName="max-h-32 overflow-y-auto"
+                />
+
+                {allows('postNsfw') || link.isNsfw ? (
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      id={id('nsfw')}
+                      checked={isNsfw}
+                      disabled={nsfwLocked}
+                      onCheckedChange={setIsNsfw}
+                    />
+                    <Label htmlFor={id('nsfw')}>{t('linkEdit.nsfw')}</Label>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+
+            {can.setTier ? (
+              <VisibilityChoice
+                name={id('visibility')}
+                own={own}
+                value={tierChoice}
+                onChange={setTierChoice}
+                isDisabled={widenLocked}
+                hint={allows('postBelow') ? t('submit.visibilityHelp') : t('linkEdit.visibilityNarrowOnly')}
+              />
+            ) : null}
+
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" size="sm">
+                  {t('app.cancel')}
+                </Button>
+              </DialogClose>
+              <Button type="submit" size="sm" disabled={pending || !valid || !changed}>
+                {t('app.save')}
+              </Button>
+            </DialogFooter>
+          </form>
+        ) : null}
+
+        {can.remove || can.retier ? (
+          <section
+            aria-labelledby={id('moderation')}
+            className={cn('flex flex-col gap-4', (can.edit || can.setTier) && 'border-t border-border pt-4')}
+          >
+            <h3 id={id('moderation')} className="text-sm font-semibold">
+              {t('linkEdit.moderation')}
+            </h3>
+
+            {can.remove ? (
+              <div className="flex flex-col gap-2">
+                {can.moderate ? (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor={id('reason')}>{t('linkEdit.removeReason')}</Label>
+                    <NativeSelect id={id('reason')} value={reason} onChange={(event) => setReason(event.target.value)}>
+                      <NativeSelectOption value="">{t('linkEdit.removeNoReason')}</NativeSelectOption>
+                      {REMOVAL_REASONS.map((key) => (
+                        <NativeSelectOption key={key} value={key}>
+                          {t(key)}
                         </NativeSelectOption>
                       ))}
-                      <NativeSelectOption value={FOLLOW}>{t('linkEdit.retierFollow')}</NativeSelectOption>
                     </NativeSelect>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-9"
-                      disabled={pending || pinTo === ''}
-                      onClick={() => void retier()}
-                    >
-                      {t('linkEdit.retierApply')}
-                    </Button>
+                    <FieldHint>{t('linkEdit.removeReasonHint')}</FieldHint>
                   </div>
-                  <FieldHint>{pinned ? t('linkEdit.retierDone') : t('linkEdit.retierHint')}</FieldHint>
+                ) : (
+                  <FieldHint>{t('linkEdit.removeOwnHint')}</FieldHint>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {confirmRemove ? (
+                    <>
+                      <Button size="sm" variant="destructive" disabled={pending} onClick={() => void remove()}>
+                        {t('linkEdit.removeConfirm')}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(false)}>
+                        {t('app.cancel')}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => setConfirmRemove(true)}>
+                      {t('linkEdit.remove')}
+                    </Button>
+                  )}
                 </div>
-              ) : null}
-            </section>
-          ) : null}
+              </div>
+            ) : null}
 
-          {failed ? (
-            <p role="alert" className="mt-4 text-sm text-destructive">
-              {t('linkEdit.failed')}
-            </p>
-          ) : null}
+            {can.retier ? (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={id('pin')}>{t('linkEdit.retier')}</Label>
+                <div className="flex gap-2">
+                  <NativeSelect
+                    id={id('pin')}
+                    value={pinTo}
+                    onChange={(event) => {
+                      setPinTo(event.target.value);
+                      setPinned(false);
+                    }}
+                  >
+                    <NativeSelectOption value="" disabled>
+                      {t('linkEdit.retierChoose')}
+                    </NativeSelectOption>
+                    {PIN_TIERS.map((option) => (
+                      <NativeSelectOption key={option.tier} value={String(option.tier)}>
+                        {tierLabel(option.label)}
+                      </NativeSelectOption>
+                    ))}
+                    <NativeSelectOption value={FOLLOW}>{t('linkEdit.retierFollow')}</NativeSelectOption>
+                  </NativeSelect>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-9"
+                    disabled={pending || pinTo === ''}
+                    onClick={() => void retier()}
+                  >
+                    {t('linkEdit.retierApply')}
+                  </Button>
+                </div>
+                <FieldHint>{pinned ? t('linkEdit.retierDone') : t('linkEdit.retierHint')}</FieldHint>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
-          {can.edit || can.setTier ? null : (
-            <div className="mt-5 flex justify-end">
-              <Dialog.Close asChild>
-                <Button variant="ghost" size="sm">
-                  {t('app.close')}
-                </Button>
-              </Dialog.Close>
-            </div>
-          )}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        {failed ? (
+          <p role="alert" className="text-sm text-destructive">
+            {t('linkEdit.failed')}
+          </p>
+        ) : null}
+
+        {can.edit || can.setTier ? null : (
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="ghost" size="sm">
+                {t('app.close')}
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

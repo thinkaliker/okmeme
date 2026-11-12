@@ -1,8 +1,17 @@
 import { useState } from 'react';
-import { Dialog } from 'radix-ui';
 import { Flag } from 'lucide-react';
 import { reports } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { FieldHint } from '@/components/ui/field';
 import { Label } from '@/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
@@ -46,7 +55,7 @@ export function ReportDialog({ subject }: ReportDialogProps) {
   }
 
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
@@ -56,66 +65,63 @@ export function ReportDialog({ subject }: ReportDialogProps) {
         }
       }}
     >
-      <Dialog.Trigger asChild>
+      <DialogTrigger asChild>
         <Button variant="ghost" size="icon" aria-label={t('link.report')} className="text-muted-foreground">
           <Flag />
         </Button>
-      </Dialog.Trigger>
+      </DialogTrigger>
 
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-popover p-5 text-popover-foreground shadow-lg">
-          <Dialog.Title className="text-base font-semibold">{t('report.title')}</Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-            {t('report.anonymous')}
-          </Dialog.Description>
+      <DialogContent showCloseButton={false} className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t('report.title')}</DialogTitle>
+          <DialogDescription>{t('report.anonymous')}</DialogDescription>
+        </DialogHeader>
 
-          {sent ? (
-            <p className="mt-4 text-sm">{t('report.sent')}</p>
-          ) : (
-            <div className="mt-4 flex flex-col gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="report-reason">{t('report.reason')}</Label>
-                <NativeSelect
-                  id="report-reason"
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value as ReasonCategory)}
-                >
-                  {REASONS.map((value) => (
-                    <NativeSelectOption key={value} value={value}>
-                      {REASON_LABEL[value]}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="report-note">{t('report.note')}</Label>
-                <Textarea
-                  id="report-note"
-                  value={note}
-                  maxLength={1000}
-                  onChange={(event) => setNote(event.target.value)}
-                />
-                <FieldHint>{t('report.anonymous')}</FieldHint>
-              </div>
+        {sent ? (
+          <p className="text-sm">{t('report.sent')}</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="report-reason">{t('report.reason')}</Label>
+              <NativeSelect
+                id="report-reason"
+                value={reason}
+                onChange={(event) => setReason(event.target.value as ReasonCategory)}
+              >
+                {REASONS.map((value) => (
+                  <NativeSelectOption key={value} value={value}>
+                    {REASON_LABEL[value]}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
             </div>
-          )}
 
-          <div className="mt-5 flex justify-end gap-2">
-            <Dialog.Close asChild>
-              <Button variant="ghost" size="sm">
-                {sent ? t('app.close') : t('app.cancel')}
-              </Button>
-            </Dialog.Close>
-            {sent ? null : (
-              <Button size="sm" disabled={pending} onClick={() => void send()}>
-                {t('report.send')}
-              </Button>
-            )}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="report-note">{t('report.note')}</Label>
+              <Textarea
+                id="report-note"
+                value={note}
+                maxLength={1000}
+                onChange={(event) => setNote(event.target.value)}
+              />
+              <FieldHint>{t('report.anonymous')}</FieldHint>
+            </div>
           </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        )}
+
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="ghost" size="sm">
+              {sent ? t('app.close') : t('app.cancel')}
+            </Button>
+          </DialogClose>
+          {sent ? null : (
+            <Button size="sm" disabled={pending} onClick={() => void send()}>
+              {t('report.send')}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
