@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 /* Dark mode is a class on <html>, set by the pre-paint script in index.html and
    thereafter by ThemeProvider. The default is prefers-color-scheme; an explicit

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
+import { Dialog } from 'radix-ui';
 import { Flag } from 'lucide-react';
 import { reports } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';

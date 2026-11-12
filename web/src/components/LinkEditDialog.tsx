@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
+import { Dialog } from 'radix-ui';
 import { Settings } from 'lucide-react';
 import { admin, links as linksApi, taxonomy } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';
