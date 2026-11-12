@@ -82,6 +82,8 @@ promotion is manual and always granted from above. this is consistent with the v
 
 the table above is the default. admins and owners may adjust what a tier *below their own* may do — posting, voting, editing their own posts, marking nsfw, creating tags without review, moderating lower tiers — the way discord roles work: never your own tier or above, and an admin never hands out something they do not hold. the rules the ring depends on are fixed and shown as such. every user sees the table for their own tier and below on their account page.
 
+anyone may also **view the site as a lower tier** — discord's "view server as role" — from an eye in the header, which puts a bar across the top with the tier picker and the way out. the server builds the preview, it only ever goes down, and it is read-only. it is open to everyone rather than a permission, because a lower tier's view is a subset of yours; see [VISIBILITY.md](VISIBILITY.md#view-as).
+
 the full capability matrix, what is fixed, and the visibility rules are in [VISIBILITY.md](VISIBILITY.md).
 
 ## links

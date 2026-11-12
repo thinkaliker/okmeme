@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../app.js';
+import { viewAs } from '../context.js';
 import { decodeCursor, parseLimit } from '../lib/cursor.js';
 import { linksPage } from '../services/linkpage.js';
 import type { Sort } from '../visibility.js';
@@ -14,12 +15,15 @@ import type { Sort } from '../visibility.js';
  *
  * Neither returns a count. A count of matches is a count of rows, including the
  * ones the caller is not allowed to know exist.
+ *
+ * Both take `view_as`, answering for a member of a lower tier instead of the
+ * caller — see `viewAs` in src/context.ts.
  */
 export function feedRoutes(): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
 
   app.get('/feed', async (c) => {
-    const viewer = c.get('viewer');
+    const viewer = await viewAs(c.get('viewer'), c.req.query('view_as'));
     const sort: Sort = c.req.query('sort') === 'top' ? 'top' : 'new';
 
     return c.json(
@@ -35,9 +39,13 @@ export function feedRoutes(): Hono<AppEnv> {
   });
 
   app.get('/search', async (c) => {
-    const viewer = c.get('viewer');
+    const viewer = await viewAs(c.get('viewer'), c.req.query('view_as'));
     const q = c.req.query('q') ?? '';
     const bookmarked = c.req.query('bookmarked') === 'true';
+
+    // A preview answers for some member of a tier, who has bookmarked nothing.
+    // Dropping the filter instead would answer a different question.
+    if (bookmarked && viewer.preview) return c.json({ items: [], nextCursor: null });
 
     return c.json(
       await linksPage({

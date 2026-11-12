@@ -1,5 +1,6 @@
 import type { RequestOptions } from '@/api/client';
 import { transport } from '@/api/transport';
+import { viewAsTier } from '@/api/viewAs';
 import type {
   Category,
   FeedQuery,
@@ -54,6 +55,7 @@ export const feed = {
           category: query.category ?? undefined,
           tag: query.tag ?? undefined,
           sort: query.sort ?? undefined,
+          view_as: viewAsTier(),
         },
         extra,
       ),
@@ -72,6 +74,7 @@ export const feed = {
           category: query.category ?? undefined,
           tag: query.tag ?? undefined,
           bookmarked: query.bookmarked ?? undefined,
+          view_as: viewAsTier(),
         },
         extra,
       ),
@@ -81,7 +84,11 @@ export const feed = {
 
 export const links = {
   get(publicId: string, extra?: Signal): Promise<Link> {
-    return transport.request<Link>('GET', `/links/${publicId}`, options(undefined, extra));
+    return transport.request<Link>(
+      'GET',
+      `/links/${publicId}`,
+      options({ view_as: viewAsTier() }, extra),
+    );
   },
 
   submit(draft: SubmitDraft): Promise<Link> {

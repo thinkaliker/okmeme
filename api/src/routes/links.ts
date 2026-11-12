@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppEnv } from '../app.js';
-import { requireTier } from '../context.js';
+import { requireTier, viewAs } from '../context.js';
 import { db } from '../db.js';
 import { forbidden, invalid, notFound } from '../errors.js';
 import { publicId } from '../lib/ids.js';
@@ -65,7 +65,8 @@ export function linkRoutes(): Hono<AppEnv> {
   /* -------------------------------------------------------------- read */
 
   app.get('/links/:publicId', async (c) => {
-    const viewer = c.get('viewer');
+    // A shared link opened while previewing is read as that tier would read it.
+    const viewer = await viewAs(c.get('viewer'), c.req.query('view_as'));
     const id = c.req.param('publicId');
 
     const visible = await findVisibleLink(viewer, id);

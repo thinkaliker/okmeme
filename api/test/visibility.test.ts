@@ -38,6 +38,7 @@ const viewer = (tier: number, userId: bigint | null = null, showNsfw = false): V
   lockedOut: false,
   via: userId === null ? 'anonymous' : 'cookie',
   ip: '203.0.113.1',
+  preview: false,
 });
 
 describe.skipIf(!enabled)('the visibility predicate', () => {

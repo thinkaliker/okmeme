@@ -43,6 +43,11 @@ invisible from a single seat. The same fixtures look different from each tier �
 | `root` | 4 admin | everything, real names throughout |
 | `vye` | 2 full | under a sanction — mute plus content hold, with an appeal form |
 
+Signed in, the eye in the header previews the site as any tier below yours —
+log in as `root` and pick `limited` to watch the same rows lose their authors
+without switching accounts. The fake applies `view_as` exactly as the server
+does; see [VISIBILITY.md](../VISIBILITY.md#view-as).
+
 To see the tag flow: submit as `dana`, type a tag that does not exist, and watch
 it appear on the post marked *pending*. Log in as `kes` and the same post has no
 such tag. Log in as `pip`, approve it under Moderation, and it becomes an

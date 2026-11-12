@@ -137,6 +137,16 @@ fixed, because the ring depends on them:
 
 what a viewer sees of the table obeys the ring like everything else: **columns stop at their own tier**, and a row appears only if some visible column holds it or they can change it. a limited user's table is four rows long and mentions nothing above them. the per-post `viewerCan` flags the edit cog reads are true only for content the viewer already sees by name or their own posts, so the cog's presence says nothing a 404 from the edit route would not.
 
+## view as
+
+a viewer may read the feed, search and a single link **as a lower tier would**, the way discord lets you view a server as a role. the client sends `view_as=<tier>` and the server answers that read for a stand-in member of that tier instead of for the caller. it is a server feature because it has to be: only the server holds the rows a lower tier cannot see, so a client could never fake a preview by hiding things.
+
+it only goes down. the stand-in is at most the caller's own tier (which is just the caller), never above it, and every tier above is refused with the same 403 — the refusal does not say which tiers exist. because of the ring, everything a tier `P` receives a tier `T >= P` can already see: rows at `E <= P + 1` sit inside `E <= T + 1`, and no label exceeds `P + 1 <= T + 1`. a preview can only take things away. it also holds only permissions the caller holds themselves, since cells are adjustable and a lower tier may hold something the caller's was refused.
+
+the stand-in is *some* member of that tier, not the caller demoted. it has no user, so the payload carries no votes, bookmarks, pending tags of the caller's own, `pinnedTier` or `viewerCan` — what a stranger at that tier receives — and nothing can be written as it. the nsfw clause uses the caller's own preference, at a tier allowed to have one. writes, and every other route, ignore `view_as` and answer for the caller; the web client hides write controls while previewing.
+
+**it is not a permission.** every signed-in viewer may preview any tier below their own. comparing views does show something no single view says — which tier a named author posted at, and which audience a post labelled one rung up was posted to — but that never reaches past one rung, never carries an identity from above, and is exactly what a real member of that tier sees on their own screen and could show anyone. the ring guards what crosses upward; a lower tier's view is a subset of yours, so a preview has nothing to carry up.
+
 ## structural leaks and how they're closed
 
 things that leak through shape rather than content, and the rule that closes each:

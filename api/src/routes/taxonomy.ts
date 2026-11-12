@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppEnv } from '../app.js';
-import { requirePermission, requireTier, requireTierOrHide } from '../context.js';
+import { requirePermission, requireTier, requireTierOrHide, viewAs } from '../context.js';
 import { db } from '../db.js';
 import { conflict, invalid, notFound } from '../errors.js';
 import { isValidTagSlug, toCategorySlug, toTagSlug } from '../lib/slug.js';
@@ -143,7 +143,7 @@ export function taxonomyRoutes(): Hono<AppEnv> {
   /* -------------------------------------------------------------- tags */
 
   app.get('/tags', async (c) => {
-    const viewer = c.get('viewer');
+    const viewer = await viewAs(c.get('viewer'), c.req.query('view_as'));
     return c.json(
       await listTags({ userId: viewer.user?.id ?? null, tier: viewer.tier }),
     );

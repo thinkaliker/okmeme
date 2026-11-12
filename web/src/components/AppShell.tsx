@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link as RouterLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom';
 import { Bookmark, KeyRound, LogIn, LogOut, Menu, Plus, Search, Settings, Shield } from 'lucide-react';
 import { CategoryNav } from '@/components/CategoryNav';
 import { NotificationBell } from '@/components/NotificationBell';
 import { SanctionBannerSlot } from '@/components/SanctionBanner';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { PreviewBar, ViewAsTrigger } from '@/components/ViewAs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
@@ -61,10 +62,16 @@ function SearchForm() {
 }
 
 export function AppShell() {
-  const { me, tier, allows, logout } = useSession();
+  const { me, tier, allows, viewAs, logout } = useSession();
   const { width } = useDisplay();
   const [navOpen, setNavOpen] = useState(false);
+  const viewAsFocus = useRef<'bar' | 'trigger' | null>(null);
   usePreferenceSync();
+
+  // While previewing, the nav is the one the previewed tier would get. The
+  // admin and owner routes stay reachable by address and answer for the real
+  // viewer — they are not content, and the server gates them as ever.
+  const navTier = viewAs ?? tier;
 
   // One container width for the header and the content, so the two never drift
   // apart. Wide is a desktop concern only; on a phone both are the full window.
@@ -80,6 +87,7 @@ export function AppShell() {
       </a>
 
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+        <PreviewBar container={container} focusAfter={viewAsFocus} />
         <div className={cn(container, 'flex h-14 items-center gap-2')}>
           <Button
             variant="ghost"
@@ -109,6 +117,7 @@ export function AppShell() {
             </Button>
           ) : null}
 
+          <ViewAsTrigger focusAfter={viewAsFocus} />
           <NotificationBell />
           <ThemeToggle />
 
@@ -158,7 +167,9 @@ export function AppShell() {
                   </RouterLink>
                 </Button>
               ) : null}
-              {me === null ? null : (
+              {/* Bookmarks are yours, not the previewed tier's, and the list is
+                  not answered through the preview, so it has no place in one. */}
+              {me === null || viewAs !== null ? null : (
                 <Button variant="ghost" size="sm" asChild className="justify-start">
                   <RouterLink to="/bookmarks" onClick={() => setNavOpen(false)}>
                     <Bookmark />
@@ -177,17 +188,17 @@ export function AppShell() {
               {/* Presentation only. The routes are gated on the server; hiding
                   the entry here keeps the nav tidy and authorizes nothing.
                   Staff reach it for the tag queue and nothing else. */}
-              {can.createTags(tier) || can.reviewReports(tier) ? (
+              {can.createTags(navTier) || can.reviewReports(navTier) ? (
                 <Button variant="ghost" size="sm" asChild className="justify-start">
                   <RouterLink to="/admin" onClick={() => setNavOpen(false)}>
                     <Shield />
-                    {can.reviewReports(tier) ? t('nav.admin') : t('nav.moderation')}
+                    {can.reviewReports(navTier) ? t('nav.admin') : t('nav.moderation')}
                   </RouterLink>
                 </Button>
               ) : null}
               {/* Owner is recovery and system settings only, so it gets its own
                   entry rather than sharing the moderation one. */}
-              {can.ownerSettings(tier) ? (
+              {can.ownerSettings(navTier) ? (
                 <Button variant="ghost" size="sm" asChild className="justify-start">
                   <RouterLink to="/owner" onClick={() => setNavOpen(false)}>
                     <KeyRound />
@@ -201,7 +212,9 @@ export function AppShell() {
 
         <main id="main" className={`${navOpen ? 'hidden' : 'block'} min-w-0 flex-1 md:block`}>
           <SanctionBannerSlot />
-          <Outlet />
+          {/* A new tier is a new set of rows, not an edit to the old ones:
+              remounting starts every list from its first page, for that tier. */}
+          <Outlet key={viewAs ?? 'self'} />
         </main>
       </div>
     </div>

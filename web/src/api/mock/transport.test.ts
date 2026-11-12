@@ -451,3 +451,69 @@ describe('an author moving their own post', () => {
     await api.request('PATCH', '/admin/permissions', { body: { tier: 3, capability: 'postBelow', granted: true } });
   });
 });
+
+describe('view as a lower tier', () => {
+  const page = (query: Record<string, string | number> = {}) =>
+    api.request<Page<Link>>('GET', '/feed', { query: { limit: 50, ...query } });
+  const status = (promise: Promise<unknown>) =>
+    promise.then(
+      () => 200,
+      (error: { status: number }) => error.status,
+    );
+  const shape = (items: readonly Link[]) =>
+    items.map((item) => [item.publicId, item.author]).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+
+  it('hands an admin exactly what a limited reader is handed', async () => {
+    await loginAs('dana');
+    const limited = shape((await page()).items);
+    await loginAs('root');
+    expect(shape((await page({ view_as: 1 })).items)).toEqual(limited);
+
+    await loginAs(null);
+    const anonymous = shape((await page()).items);
+    await loginAs('root');
+    expect(shape((await page({ view_as: 0 })).items)).toEqual(anonymous);
+  });
+
+  it('answers for nobody in particular', async () => {
+    await loginAs('root');
+    const first = (await page()).items[0];
+    if (first === undefined) throw new Error('fixtures have no posts');
+    await api.request('POST', `/links/${first.publicId}/vote`);
+    await api.request('POST', `/links/${first.publicId}/bookmark`);
+
+    const seen = (await page({ view_as: 3 })).items.find((item) => item.publicId === first.publicId);
+    expect(seen).toMatchObject({ viewerVote: 0, bookmarked: false });
+    for (const item of (await page({ view_as: 3 })).items) {
+      expect(Object.values(item.viewerCan).some(Boolean)).toBe(false);
+      expect('pinnedTier' in item).toBe(false);
+    }
+    const bookmarked = await api.request<Page<Link>>('GET', '/search', {
+      query: { bookmarked: true, view_as: 3 },
+    });
+    expect(bookmarked.items).toEqual([]);
+
+    await api.request('DELETE', `/links/${first.publicId}/vote`);
+    await api.request('DELETE', `/links/${first.publicId}/bookmark`);
+  });
+
+  it('only goes down, with one answer for every tier above', async () => {
+    await loginAs('sandra');
+    for (const tier of [3, 4, 5, 9]) expect(await status(page({ view_as: tier }))).toBe(403);
+    expect(await status(page({ view_as: 'full' }))).toBe(400);
+    expect(shape((await page({ view_as: 2 })).items)).toEqual(shape((await page()).items));
+    await loginAs(null);
+    expect(await status(page({ view_as: 1 }))).toBe(403);
+  });
+
+  it('reads a single link through the same lens', async () => {
+    await loginAs('root');
+    const own = (await page()).items.map((item) => item.publicId);
+    const forLimited = new Set((await page({ view_as: 1 })).items.map((item) => item.publicId));
+    const hidden = own.find((id) => !forLimited.has(id));
+    if (hidden === undefined) throw new Error('fixtures have nothing above full');
+    expect(await status(api.request('GET', `/links/${hidden}`, { query: { view_as: 1 } }))).toBe(404);
+    expect(await status(api.request('GET', `/links/${hidden}`))).toBe(200);
+  });
+
+});

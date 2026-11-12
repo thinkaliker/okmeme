@@ -109,7 +109,7 @@ const tagPill =
  * also interactive, which is what the old card got wrong.
  */
 export function LinkCard({ link, onChange, headingLevel = 2, expanded = false }: LinkCardProps) {
-  const { allows, me } = useSession();
+  const { allows, me, viewAs } = useSession();
   const [pending, setPending] = useState(false);
   const Heading = headingLevel === 1 ? 'h1' : 'h2';
 
@@ -306,7 +306,10 @@ export function LinkCard({ link, onChange, headingLevel = 2, expanded = false }:
           </Button>
         ) : null}
 
-        {me === null ? null : <ReportDialog subject={{ type: 'link', publicId: link.publicId }} />}
+        {/* A preview is read-only; a report would be filed as you. */}
+        {me === null || viewAs !== null ? null : (
+          <ReportDialog subject={{ type: 'link', publicId: link.publicId }} />
+        )}
 
         {/* Renders nothing unless the server says this viewer may act on this
             post — the client never knows the tier an author is at. */}

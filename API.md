@@ -68,6 +68,8 @@ POST   /links/preview          → canonicalize + visible-scope dedup check, pre
 
 `POST /links/preview` returns whether a *visible* duplicate exists. it must never consult content outside the caller's scope.
 
+`GET /feed`, `GET /search`, `GET /links/:public_id` and `GET /tags` accept `view_as=<tier>`: answer this read for a stand-in member of a lower tier rather than the caller — the server side of "view as", open to every signed-in caller. a tier above the caller's is a 403 whatever the tier (so the answer says nothing about which exist), a non-ordinal is a 400, and the caller's own tier is an ordinary read. the stand-in has no user — no votes, bookmarks, own pending tags, `pinnedTier` or `viewerCan` — and holds only the permissions the caller also holds. `bookmarked=true` under a preview is an empty page. every other route and every write ignores it. see [VISIBILITY.md](VISIBILITY.md#view-as).
+
 `GET /search` runs the feed's predicate plus a tsvector match. it returns no result count, because a count of matches is a count of rows — including the ones the caller can't see.
 
 every link carries `viewerCan: { edit, remove, retier, moderate }`, resolved for the caller. the client cannot work these out itself — it never learns the tier an identified author is at — and they say nothing the caller could not learn by trying: `moderate` is only ever true for content strictly below the caller's tier, which they already see by name. `PATCH` and `DELETE /links/:public_id` accept the author (`PATCH` needs the `editOwn` permission) or a holder of `moderate` strictly above the post's effective tier; anyone else gets a 404. emptying a text post's body is refused.

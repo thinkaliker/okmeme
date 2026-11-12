@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { ANONYMOUS_VIEWER, viewAs, type Viewer } from '../src/context.js';
+import { ApiError } from '../src/errors.js';
 import { resetEnv } from '../src/env.js';
 import { blobStore, resetBlobStore } from '../src/ports/blob/index.js';
 import { deriveAtSubmit, readOrRegenerate } from '../src/services/media.js';
@@ -419,5 +421,61 @@ describe('an author moving their own post', () => {
     // Never above the author, and not a post a moderator pinned above them.
     expect(canSetOwnTier(fullBelow, TIER.full, TIER.staff)).toBe(false);
     expect(canSetOwnTier(fullBelow, TIER.staff, null)).toBe(false);
+  });
+});
+
+describe('view as a lower tier', () => {
+  // Every case here is decided before any permission row is read, so none of
+  // them needs a database. What a preview returns is in test/preview.test.ts.
+  const person = (tier: number): Viewer => ({
+    user: {
+      id: 1n,
+      publicId: 'u_1',
+      username: 'someone',
+      tier,
+      showNsfw: true,
+      theme: 'system',
+      display: {},
+      createdAt: new Date(),
+    },
+    tier,
+    showNsfw: tier >= TIER.full,
+    sanction: null,
+    permissions: effectivePermissions(tier, new Map()),
+    lockedOut: false,
+    via: 'cookie',
+    ip: '203.0.113.1',
+    preview: false,
+  });
+
+  const status = async (attempt: Promise<unknown>): Promise<number> => {
+    try {
+      await attempt;
+      return 200;
+    } catch (error) {
+      return error instanceof ApiError ? error.status : 500;
+    }
+  };
+
+  it('answers for the caller when nothing, or their own tier, is asked for', async () => {
+    const full = person(TIER.full);
+    expect(await viewAs(full, undefined)).toBe(full);
+    expect(await viewAs(full, '')).toBe(full);
+    expect(await viewAs(full, String(TIER.full))).toBe(full);
+    const anonymous = ANONYMOUS_VIEWER('203.0.113.1');
+    expect(await viewAs(anonymous, '0')).toBe(anonymous);
+  });
+
+  it('refuses every tier above your own with one answer', async () => {
+    const full = person(TIER.full);
+    // Staff, admin, owner and a tier that does not exist are indistinguishable.
+    for (const raw of ['3', '4', '5', '9']) expect(await status(viewAs(full, raw))).toBe(403);
+    expect(await status(viewAs(ANONYMOUS_VIEWER('203.0.113.1'), '1'))).toBe(403);
+  });
+
+  it('refuses anything that is not a tier ordinal', async () => {
+    for (const raw of ['-1', '1.5', 'full', '10', ' 1']) {
+      expect(await status(viewAs(person(TIER.admin), raw))).toBe(400);
+    }
   });
 });

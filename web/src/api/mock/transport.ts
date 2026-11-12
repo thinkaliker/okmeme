@@ -213,12 +213,28 @@ function writeStoredSession(userId: number | null): void {
  * Viewer resolution
  * ---------------------------------------------------------------- */
 
+/**
+ * `viewAs` in api/src/context.ts. While set, a content read is answered for
+ * some member of `tier` — nobody in particular — instead of the session: no
+ * user, so no votes, bookmarks, own pending tags, pin or `viewerCan`. It is
+ * set for the length of one `handle` call and never outlives it.
+ */
+interface Lens {
+  readonly tier: ViewerTier;
+  readonly showNsfw: boolean;
+  readonly permissions: ReadonlySet<Capability>;
+}
+
+let lens: Lens | null = null;
+
 function currentUser(): MockUser | null {
+  if (lens !== null) return null;
   if (state.sessionUserId === null) return null;
   return MOCK_USERS.find((u) => u.id === state.sessionUserId) ?? null;
 }
 
 function currentTier(): ViewerTier {
+  if (lens !== null) return lens.tier;
   const user = currentUser();
   return user === null ? ANONYMOUS : viewerTier(user.tier);
 }
@@ -229,6 +245,7 @@ function permissionsFor(tier: number): Set<Capability> {
 
 /** `viewer.permissions` on the server: read fresh on every request. */
 function viewerPermissions(): ReadonlySet<Capability> {
+  if (lens !== null) return lens.permissions;
   const user = currentUser();
   return user === null ? new Set() : permissionsFor(user.tier);
 }
@@ -300,6 +317,7 @@ function visibleTo(viewer: ViewerTier, showNsfw: boolean, row: Row): boolean {
 }
 
 function viewerShowsNsfw(): boolean {
+  if (lens !== null) return lens.showNsfw;
   const user = currentUser();
   return user === null ? false : prefsFor(user).showNsfw;
 }
@@ -385,8 +403,9 @@ function toPayload(viewer: ViewerTier, row: Row): Link {
     category: categoryOf(row.categorySlug),
     tags: tagsOf(row.tagSlugs, row, viewer),
     score: row.score + (state.votes.has(row.publicId) ? 1 : 0),
-    viewerVote: (state.votes.has(row.publicId) ? 1 : 0) as 1 | 0,
-    bookmarked: state.bookmarks.has(row.publicId),
+    // The fake keeps one session's votes and bookmarks; a preview has none.
+    viewerVote: (lens === null && state.votes.has(row.publicId) ? 1 : 0) as 1 | 0,
+    bookmarked: lens === null && state.bookmarks.has(row.publicId),
     isNsfw: row.isNsfw,
     createdAt: row.createdAt,
     editedAt: row.editedAt,
@@ -715,7 +734,40 @@ interface LoginBody {
   username?: string;
 }
 
+/** The reads that take `view_as`, as on the server. Everything else ignores it. */
+const PREVIEWABLE = /^\/(?:feed|search|tags|links\/[^/]+)$/;
+
+/** Who the lens stands in for, or null for the session itself. Refusals match the server's. */
+function resolveLens(raw: unknown): Lens | null {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const text = String(raw);
+  if (!/^\d$/.test(text)) throw new ApiError(400, 'invalid_view_as', 'view_as must be a tier ordinal');
+  const tier = Number(text);
+  const own = currentTier();
+  if (tier === own) return null;
+  // Anonymous is tier 0, so this refuses them anything but their own view.
+  if (tier > own) throw new ApiError(403, 'forbidden', 'you can only preview your own tier or a lower one');
+  // Never a permission the caller does not hold themselves.
+  const held = viewerPermissions();
+  const permissions = new Set(
+    [...(tier === TIER.anonymous ? [] : permissionsFor(tier))].filter((capability) => held.has(capability)),
+  );
+  return { tier: viewerTier(tier), showNsfw: viewerShowsNsfw() && tier >= TIER.full, permissions };
+}
+
 function handle(method: Method, path: string, options: RequestOptions): unknown {
+  if (method !== 'GET' || !PREVIEWABLE.test(path)) return route(method, path, options);
+  const next = resolveLens(options.query?.['view_as']);
+  if (next === null) return route(method, path, options);
+  lens = next;
+  try {
+    return route(method, path, options);
+  } finally {
+    lens = null;
+  }
+}
+
+function route(method: Method, path: string, options: RequestOptions): unknown {
   const query = options.query;
 
   if (method === 'GET' && path === '/feed') {
@@ -731,6 +783,8 @@ function handle(method: Method, path: string, options: RequestOptions): unknown 
   if (method === 'GET' && path === '/search') {
     const q = String(query?.['q'] ?? '').toLowerCase().trim();
     const bookmarked = query?.['bookmarked'] === true || query?.['bookmarked'] === 'true';
+    // A preview has bookmarked nothing; dropping the filter would list everything.
+    if (bookmarked && lens !== null) return { items: [], nextCursor: null };
     const rows = state.rows
       .filter((row) => !bookmarked || state.bookmarks.has(row.publicId))
       .filter((row) => {
