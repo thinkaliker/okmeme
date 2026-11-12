@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 export function Card({ className, ...props }: ComponentProps<'article'>) {
   return (
     <article
+      data-slot="card"
       className={cn(
         'rounded-lg border border-border bg-card text-card-foreground shadow-xs',
         className,

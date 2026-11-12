@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { me as meApi } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';
-import { FeedSkeleton } from '@/components/ui/skeleton';
+import { FeedSkeleton } from '@/components/FeedSkeleton';
 import type { Notification, NotificationKind } from '@/domain/notification';
 import { useCursorList } from '@/hooks/useCursorList';
 import { t, tOptional } from '@/i18n/t';

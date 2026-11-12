@@ -7,7 +7,11 @@ import { notifyCategoriesChanged } from '@/components/CategoryNav';
 import { RecoveryCodes } from '@/components/RecoveryCodes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FieldHint, Input, Label, Select, Textarea } from '@/components/ui/field';
+import { FieldHint } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Textarea } from '@/components/ui/textarea';
 import type {
   AdminAppeal,
   AdminCategory,
@@ -331,7 +335,7 @@ function Appeals() {
                 <Label htmlFor={`outcome-${appeal.id}`} className="text-xs">
                   {t('admin.appealOutcome')}
                 </Label>
-                <Select
+                <NativeSelect
                   id={`outcome-${appeal.id}`}
                   value={current.outcome}
                   onChange={(event) =>
@@ -342,11 +346,11 @@ function Appeals() {
                   }
                 >
                   {OUTCOMES.map(([value, key]) => (
-                    <option key={value} value={value}>
+                    <NativeSelectOption key={value} value={value}>
                       {t(key)}
-                    </option>
+                    </NativeSelectOption>
                   ))}
-                </Select>
+                </NativeSelect>
               </div>
 
               <div className="flex min-w-48 flex-1 flex-col gap-1">
@@ -517,17 +521,17 @@ function SuspendForm({ user, onDone }: { user: AdminUser; onDone: () => void }) 
           <Label htmlFor={`reason-${user.publicId}`} className="text-xs">
             {t('admin.suspendReason')}
           </Label>
-          <Select
+          <NativeSelect
             id={`reason-${user.publicId}`}
             value={reasonCategory}
             onChange={(event) => setReasonCategory(event.target.value as ReasonCategory)}
           >
             {REASONS.map((reason) => (
-              <option key={reason} value={reason}>
+              <NativeSelectOption key={reason} value={reason}>
                 {t(`sanction.reason.${reason}` as MessageKey)}
-              </option>
+              </NativeSelectOption>
             ))}
-          </Select>
+          </NativeSelect>
         </div>
       </div>
 
@@ -652,17 +656,17 @@ function TierControl({
         <Label htmlFor={`tier-${user.publicId}`} className="text-xs">
           {t('admin.setTier')}
         </Label>
-        <Select
+        <NativeSelect
           id={`tier-${user.publicId}`}
           value={String(draft)}
           onChange={(event) => setDraft(Number(event.target.value))}
         >
           {choices.map((tier) => (
-            <option key={tier} value={tier}>
+            <NativeSelectOption key={tier} value={tier}>
               {tierText(tier)}
-            </option>
+            </NativeSelectOption>
           ))}
-        </Select>
+        </NativeSelect>
       </div>
       <Button
         size="sm"
@@ -1025,7 +1029,7 @@ function Categories() {
                           <Label htmlFor={`category-move-${category.slug}`} className="text-xs">
                             {t('admin.categoryMoveTo')}
                           </Label>
-                          <Select
+                          <NativeSelect
                             id={`category-move-${category.slug}`}
                             value={deleting.moveTo}
                             onChange={(event) =>
@@ -1033,11 +1037,11 @@ function Categories() {
                             }
                           >
                             {others.map((other) => (
-                              <option key={other.slug} value={other.slug}>
+                              <NativeSelectOption key={other.slug} value={other.slug}>
                                 {other.name}
-                              </option>
+                              </NativeSelectOption>
                             ))}
-                          </Select>
+                          </NativeSelect>
                         </div>
                       </>
                     )}
@@ -1554,16 +1558,16 @@ function SettingInput({
 
   if (kind === 'boolean') {
     return (
-      <Select
+      <NativeSelect
         aria-label={setting.key}
-        className="w-auto font-mono"
+        className="w-fit font-mono"
         disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
-        <option value="true">true</option>
-        <option value="false">false</option>
-      </Select>
+        <NativeSelectOption value="true">true</NativeSelectOption>
+        <NativeSelectOption value="false">false</NativeSelectOption>
+      </NativeSelect>
     );
   }
 

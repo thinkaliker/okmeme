@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { links as linksApi } from '@/api/endpoints';
 import { LinkCard } from '@/components/LinkCard';
-import { FeedSkeleton } from '@/components/ui/skeleton';
+import { FeedSkeleton } from '@/components/FeedSkeleton';
 import type { Link } from '@/domain/link';
 import { t } from '@/i18n/t';
 

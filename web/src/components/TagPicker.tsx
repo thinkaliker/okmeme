@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { FieldHint, Input, Label } from '@/components/ui/field';
+import { FieldHint } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { Tag } from '@/domain/link';
 import { t } from '@/i18n/t';
 import { cn } from '@/lib/utils';

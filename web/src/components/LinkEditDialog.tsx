@@ -3,7 +3,11 @@ import { Dialog } from 'radix-ui';
 import { Settings } from 'lucide-react';
 import { admin, links as linksApi, taxonomy } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';
-import { FieldHint, Input, Label, Select, Textarea } from '@/components/ui/field';
+import { FieldHint } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { TagPicker } from '@/components/TagPicker';
 import { VisibilityChoice } from '@/components/VisibilityChoice';
@@ -248,17 +252,17 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
 
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor={id('category')}>{t('linkEdit.category')}</Label>
-                    <Select
+                    <NativeSelect
                       id={id('category')}
                       value={categorySlug}
                       onChange={(event) => setCategorySlug(event.target.value)}
                     >
                       {categoryOptions.map((category) => (
-                        <option key={category.slug} value={category.slug}>
+                        <NativeSelectOption key={category.slug} value={category.slug}>
                           {tOptional(category.nameKey, category.name)}
-                        </option>
+                        </NativeSelectOption>
                       ))}
-                    </Select>
+                    </NativeSelect>
                   </div>
 
                   <TagPicker
@@ -324,14 +328,14 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
                   {can.moderate ? (
                     <div className="flex flex-col gap-1.5">
                       <Label htmlFor={id('reason')}>{t('linkEdit.removeReason')}</Label>
-                      <Select id={id('reason')} value={reason} onChange={(event) => setReason(event.target.value)}>
-                        <option value="">{t('linkEdit.removeNoReason')}</option>
+                      <NativeSelect id={id('reason')} value={reason} onChange={(event) => setReason(event.target.value)}>
+                        <NativeSelectOption value="">{t('linkEdit.removeNoReason')}</NativeSelectOption>
                         {REMOVAL_REASONS.map((key) => (
-                          <option key={key} value={key}>
+                          <NativeSelectOption key={key} value={key}>
                             {t(key)}
-                          </option>
+                          </NativeSelectOption>
                         ))}
-                      </Select>
+                      </NativeSelect>
                       <FieldHint>{t('linkEdit.removeReasonHint')}</FieldHint>
                     </div>
                   ) : (
@@ -360,7 +364,7 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor={id('pin')}>{t('linkEdit.retier')}</Label>
                   <div className="flex gap-2">
-                    <Select
+                    <NativeSelect
                       id={id('pin')}
                       value={pinTo}
                       onChange={(event) => {
@@ -368,16 +372,16 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
                         setPinned(false);
                       }}
                     >
-                      <option value="" disabled>
+                      <NativeSelectOption value="" disabled>
                         {t('linkEdit.retierChoose')}
-                      </option>
+                      </NativeSelectOption>
                       {PIN_TIERS.map((option) => (
-                        <option key={option.tier} value={String(option.tier)}>
+                        <NativeSelectOption key={option.tier} value={String(option.tier)}>
                           {tierLabel(option.label)}
-                        </option>
+                        </NativeSelectOption>
                       ))}
-                      <option value={FOLLOW}>{t('linkEdit.retierFollow')}</option>
-                    </Select>
+                      <NativeSelectOption value={FOLLOW}>{t('linkEdit.retierFollow')}</NativeSelectOption>
+                    </NativeSelect>
                     <Button
                       size="sm"
                       variant="outline"

@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { ApiError } from '@/api/client';
 import { owner } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';
-import { FieldHint, Input, Label, Select } from '@/components/ui/field';
+import { FieldHint } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import type { InstanceSetting, Owner } from '@/domain/admin';
 import { TIER, can } from '@/domain/tier';
 import { t } from '@/i18n/t';
@@ -137,18 +140,18 @@ export default function OwnerRoute() {
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="invite-min-tier">{t('owner.inviteMinTier')}</Label>
-          <Select
+          <NativeSelect
             id="invite-min-tier"
             value={String(minTier)}
             onChange={(event) => setMinTier(Number(event.target.value))}
             className="max-w-40"
           >
             {[TIER.full, TIER.staff, TIER.admin, TIER.owner].map((value) => (
-              <option key={value} value={value}>
+              <NativeSelectOption key={value} value={value}>
                 {value}
-              </option>
+              </NativeSelectOption>
             ))}
-          </Select>
+          </NativeSelect>
 
           {/* Stated plainly, because the interface is the only place it can be:
               the change is audited, and raising the value back does not unbuild

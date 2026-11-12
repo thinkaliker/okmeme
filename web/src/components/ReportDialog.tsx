@@ -3,7 +3,10 @@ import { Dialog } from 'radix-ui';
 import { Flag } from 'lucide-react';
 import { reports } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';
-import { FieldHint, Label, Select, Textarea } from '@/components/ui/field';
+import { FieldHint } from '@/components/ui/field';
+import { Label } from '@/components/ui/label';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Textarea } from '@/components/ui/textarea';
 import type { ReasonCategory } from '@/domain/user';
 import { t } from '@/i18n/t';
 
@@ -73,17 +76,17 @@ export function ReportDialog({ subject }: ReportDialogProps) {
             <div className="mt-4 flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="report-reason">{t('report.reason')}</Label>
-                <Select
+                <NativeSelect
                   id="report-reason"
                   value={reason}
                   onChange={(event) => setReason(event.target.value as ReasonCategory)}
                 >
                   {REASONS.map((value) => (
-                    <option key={value} value={value}>
+                    <NativeSelectOption key={value} value={value}>
                       {REASON_LABEL[value]}
-                    </option>
+                    </NativeSelectOption>
                   ))}
-                </Select>
+                </NativeSelect>
               </div>
 
               <div className="flex flex-col gap-1.5">

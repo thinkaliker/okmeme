@@ -8,7 +8,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { PreviewBar, ViewAsTrigger } from '@/components/ViewAs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { useDisplay } from '@/display/DisplayProvider';
 import { can, isAuthorTierLabel } from '@/domain/tier';
 import { t, tierLabel } from '@/i18n/t';

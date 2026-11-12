@@ -4,7 +4,9 @@ import { ApiError } from '@/api/client';
 import { auth } from '@/api/endpoints';
 import { RecoveryCodes } from '@/components/RecoveryCodes';
 import { Button } from '@/components/ui/button';
-import { FieldHint, Input, Label } from '@/components/ui/field';
+import { FieldHint } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { t } from '@/i18n/t';
 import { useSession } from '@/session/SessionProvider';
 

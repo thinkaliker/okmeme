@@ -1,7 +1,7 @@
 import { GalleryTile } from '@/components/GalleryTile';
 import { LinkCard } from '@/components/LinkCard';
 import { Button } from '@/components/ui/button';
-import { FeedSkeleton } from '@/components/ui/skeleton';
+import { FeedSkeleton } from '@/components/FeedSkeleton';
 import { useDisplay } from '@/display/DisplayProvider';
 import type { Link } from '@/domain/link';
 import type { Page } from '@/domain/page';

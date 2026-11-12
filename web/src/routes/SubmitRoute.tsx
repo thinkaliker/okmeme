@@ -5,7 +5,11 @@ import { ApiError } from '@/api/client';
 import { TagPicker } from '@/components/TagPicker';
 import { VisibilityChoice } from '@/components/VisibilityChoice';
 import { Button } from '@/components/ui/button';
-import { FieldHint, Input, Label, Select, Textarea } from '@/components/ui/field';
+import { FieldHint } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import type { Category, LinkKind, PreviewResult, Tag } from '@/domain/link';
 import { TIER } from '@/domain/tier';
@@ -194,17 +198,17 @@ export default function SubmitRoute() {
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="submit-category">{t('submit.category')}</Label>
-        <Select
+        <NativeSelect
           id="submit-category"
           value={categorySlug}
           onChange={(event) => setCategorySlug(event.target.value)}
         >
           {categories.map((category) => (
-            <option key={category.slug} value={category.slug}>
+            <NativeSelectOption key={category.slug} value={category.slug}>
               {category.name}
-            </option>
+            </NativeSelectOption>
           ))}
-        </Select>
+        </NativeSelect>
       </div>
 
       <TagPicker
