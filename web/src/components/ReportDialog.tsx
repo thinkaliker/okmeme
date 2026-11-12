@@ -12,8 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { FieldHint } from '@/components/ui/field';
-import { Label } from '@/components/ui/label';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import type { ReasonCategory } from '@/domain/user';
@@ -81,8 +80,8 @@ export function ReportDialog({ subject }: ReportDialogProps) {
           <p className="text-sm">{t('report.sent')}</p>
         ) : (
           <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="report-reason">{t('report.reason')}</Label>
+            <Field>
+              <FieldLabel htmlFor="report-reason">{t('report.reason')}</FieldLabel>
               <NativeSelect
                 id="report-reason"
                 value={reason}
@@ -94,18 +93,18 @@ export function ReportDialog({ subject }: ReportDialogProps) {
                   </NativeSelectOption>
                 ))}
               </NativeSelect>
-            </div>
+            </Field>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="report-note">{t('report.note')}</Label>
+            <Field>
+              <FieldLabel htmlFor="report-note">{t('report.note')}</FieldLabel>
               <Textarea
                 id="report-note"
                 value={note}
                 maxLength={1000}
                 onChange={(event) => setNote(event.target.value)}
               />
-              <FieldHint>{t('report.anonymous')}</FieldHint>
-            </div>
+              <FieldDescription>{t('report.anonymous')}</FieldDescription>
+            </Field>
           </div>
         )}
 

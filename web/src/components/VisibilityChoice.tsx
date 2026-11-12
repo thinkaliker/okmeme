@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
-import { FieldHint } from '@/components/ui/field';
+import { FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AUTHOR_TIER_LABELS, TIER } from '@/domain/tier';
 import { t, tierLabel } from '@/i18n/t';
 
@@ -29,26 +30,24 @@ export function VisibilityChoice({ name, own, value, onChange, isDisabled, hint 
   for (let level = own; level >= TIER.limited; level -= 1) levels.push(level);
 
   return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="text-sm font-medium">{t('submit.visibility')}</legend>
-      <div className="flex flex-wrap gap-2">
+    <FieldSet>
+      <FieldLegend variant="label">{t('submit.visibility')}</FieldLegend>
+      <RadioGroup
+        name={name}
+        value={String(value ?? own)}
+        onValueChange={(next) => onChange(Number(next))}
+        className="flex flex-wrap gap-2"
+      >
         {levels.map((level) => {
           const lowest = AUTHOR_TIER_LABELS[level - 2];
           const isDefault = level === own;
           const disabled = isDisabled?.(level) ?? false;
           return (
-            <label
+            <FieldLabel
               key={level}
-              className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm has-checked:border-primary has-checked:bg-accent has-disabled:cursor-not-allowed has-disabled:opacity-50"
+              className="cursor-pointer items-center rounded-md border border-border px-3 py-1.5 text-sm leading-5 font-normal has-disabled:cursor-not-allowed has-disabled:opacity-50"
             >
-              <input
-                type="radio"
-                name={name}
-                checked={(value ?? own) === level}
-                disabled={disabled}
-                onChange={() => onChange(level)}
-                className="accent-primary"
-              />
+              <RadioGroupItem value={String(level)} disabled={disabled} />
               {lowest === undefined ? (
                 t('submit.visibilityEveryone')
               ) : (
@@ -60,11 +59,11 @@ export function VisibilityChoice({ name, own, value, onChange, isDisabled, hint 
               {isDefault ? (
                 <span className="text-xs text-muted-foreground">{t('submit.visibilityDefault')}</span>
               ) : null}
-            </label>
+            </FieldLabel>
           );
         })}
-      </div>
-      <FieldHint>{hint}</FieldHint>
-    </fieldset>
+      </RadioGroup>
+      <FieldDescription>{hint}</FieldDescription>
+    </FieldSet>
   );
 }

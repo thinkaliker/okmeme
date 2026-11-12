@@ -39,9 +39,9 @@ describe('LinkEditDialog, moving your own post', () => {
 
     // The options depend on the session's tier, which loads asynchronously.
     const everyone = await screen.findByRole('radio', { name: /everyone/i }, { timeout: 3000 });
-    expect((everyone as HTMLInputElement).checked).toBe(true);
+    expect(everyone.getAttribute('aria-checked')).toBe('true');
     // Full holds no postBelow by default, but going back up needs none.
-    const own = screen.getAllByRole('radio').find((radio) => radio !== everyone) as HTMLInputElement;
+    const own = screen.getAllByRole('radio').find((radio) => radio !== everyone) as HTMLButtonElement;
     expect(own.disabled).toBe(false);
     fireEvent.click(own);
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));

@@ -2,9 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { auth } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';
-import { FieldHint } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { USE_MOCK_API } from '@/config';
 import type { TierOrdinal } from '@/domain/tier';
 import { t } from '@/i18n/t';
@@ -42,8 +41,8 @@ export default function LoginRoute() {
       <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
         <h1 className="text-lg font-semibold">{t('auth.login')}</h1>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="login-username">{t('auth.username')}</Label>
+        <Field>
+          <FieldLabel htmlFor="login-username">{t('auth.username')}</FieldLabel>
           <Input
             id="login-username"
             autoComplete="username"
@@ -51,10 +50,10 @@ export default function LoginRoute() {
             value={username}
             onChange={(event) => setUsername(event.target.value)}
           />
-        </div>
+        </Field>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="login-password">{t('auth.password')}</Label>
+        <Field>
+          <FieldLabel htmlFor="login-password">{t('auth.password')}</FieldLabel>
           <Input
             id="login-password"
             type="password"
@@ -62,8 +61,8 @@ export default function LoginRoute() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
-          <FieldHint>{t('auth.noEmail')}</FieldHint>
-        </div>
+          <FieldDescription>{t('auth.noEmail')}</FieldDescription>
+        </Field>
 
         {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
 

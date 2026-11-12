@@ -7,9 +7,9 @@ import { notifyCategoriesChanged } from '@/components/CategoryNav';
 import { RecoveryCodes } from '@/components/RecoveryCodes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FieldHint } from '@/components/ui/field';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import type {
@@ -263,10 +263,10 @@ function Reports() {
             )}
 
             <div className="flex flex-wrap items-end gap-2">
-              <div className="flex min-w-48 flex-1 flex-col gap-1">
-                <Label htmlFor={`resolution-${report.id}`} className="text-xs">
+              <Field className="min-w-48 flex-1 gap-1">
+                <FieldLabel htmlFor={`resolution-${report.id}`} className="text-xs">
                   {t('admin.resolution')}
-                </Label>
+                </FieldLabel>
                 <Input
                   id={`resolution-${report.id}`}
                   value={note[report.id] ?? ''}
@@ -274,7 +274,7 @@ function Reports() {
                     setNote((current) => ({ ...current, [report.id]: event.target.value }))
                   }
                 />
-              </div>
+              </Field>
               <Button size="sm" onClick={() => void resolve(report)}>
                 {t('admin.resolve')}
               </Button>
@@ -331,10 +331,10 @@ function Appeals() {
             <p className="whitespace-pre-wrap text-sm">{appeal.body}</p>
 
             <div className="flex flex-wrap items-end gap-2">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor={`outcome-${appeal.id}`} className="text-xs">
+              <Field className="gap-1">
+                <FieldLabel htmlFor={`outcome-${appeal.id}`} className="text-xs">
                   {t('admin.appealOutcome')}
-                </Label>
+                </FieldLabel>
                 <NativeSelect
                   id={`outcome-${appeal.id}`}
                   value={current.outcome}
@@ -351,12 +351,12 @@ function Appeals() {
                     </NativeSelectOption>
                   ))}
                 </NativeSelect>
-              </div>
+              </Field>
 
-              <div className="flex min-w-48 flex-1 flex-col gap-1">
-                <Label htmlFor={`outcome-note-${appeal.id}`} className="text-xs">
+              <Field className="min-w-48 flex-1 gap-1">
+                <FieldLabel htmlFor={`outcome-note-${appeal.id}`} className="text-xs">
                   {t('admin.outcomeNote')}
-                </Label>
+                </FieldLabel>
                 <Input
                   id={`outcome-note-${appeal.id}`}
                   value={current.note}
@@ -367,7 +367,7 @@ function Appeals() {
                     }))
                   }
                 />
-              </div>
+              </Field>
 
               <Button size="sm" onClick={() => void resolve(appeal)}>
                 {t('admin.resolve')}
@@ -375,7 +375,7 @@ function Appeals() {
             </div>
 
             {/* Written by someone who sees everything, for someone who does not. */}
-            <FieldHint>{t('admin.outcomeNoteHint')}</FieldHint>
+            <FieldDescription>{t('admin.outcomeNoteHint')}</FieldDescription>
           </>
         );
       }}
@@ -472,55 +472,57 @@ function SuspendForm({ user, onDone }: { user: AdminUser; onDone: () => void }) 
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border p-3">
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-xs font-medium">{t('admin.suspendTypes')}</legend>
+      <FieldSet>
+        <FieldLegend variant="label" className="text-xs">
+          {t('admin.suspendTypes')}
+        </FieldLegend>
         <div className="flex flex-col gap-1">
           {SUSPENSION_TYPES.map((type) => (
-            <label key={type} className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="mt-1 accent-primary"
+            <Field key={type} orientation="horizontal" className="items-start">
+              <Checkbox
+                id={`suspend-${user.publicId}-${type}`}
+                className="mt-0.5"
                 checked={types.includes(type)}
-                onChange={(event) =>
+                onCheckedChange={(next) =>
                   setTypes((current) =>
-                    event.target.checked
-                      ? [...current, type]
-                      : current.filter((value) => value !== type),
+                    next === true ? [...current, type] : current.filter((value) => value !== type),
                   )
                 }
               />
-              <span>
-                <code className="font-mono text-xs">{type}</code>{' '}
-                <span className="text-muted-foreground">
-                  {t(`sanction.type.${type}` as MessageKey)}
+              <FieldLabel htmlFor={`suspend-${user.publicId}-${type}`} className="leading-5 font-normal">
+                <span>
+                  <code className="font-mono text-xs">{type}</code>{' '}
+                  <span className="text-muted-foreground">
+                    {t(`sanction.type.${type}` as MessageKey)}
+                  </span>
                 </span>
-              </span>
-            </label>
+              </FieldLabel>
+            </Field>
           ))}
         </div>
         {/* Three of the four leave content in place and are invisible from
             outside. This one empties a feed on a timer, which is observable. */}
         {types.includes('content_hold') ? (
-          <FieldHint className="text-destructive">{t('admin.contentHoldWarning')}</FieldHint>
+          <FieldDescription className="text-destructive">{t('admin.contentHoldWarning')}</FieldDescription>
         ) : null}
-      </fieldset>
+      </FieldSet>
 
       <div className="flex flex-wrap gap-3">
-        <div className="flex flex-col gap-1">
-          <Label htmlFor={`expires-${user.publicId}`} className="text-xs">
+        <Field className="gap-1">
+          <FieldLabel htmlFor={`expires-${user.publicId}`} className="text-xs">
             {t('admin.suspendExpires')}
-          </Label>
+          </FieldLabel>
           <Input
             id={`expires-${user.publicId}`}
             type="datetime-local"
             value={expiresAt}
             onChange={(event) => setExpiresAt(event.target.value)}
           />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor={`reason-${user.publicId}`} className="text-xs">
+        </Field>
+        <Field className="gap-1">
+          <FieldLabel htmlFor={`reason-${user.publicId}`} className="text-xs">
             {t('admin.suspendReason')}
-          </Label>
+          </FieldLabel>
           <NativeSelect
             id={`reason-${user.publicId}`}
             value={reasonCategory}
@@ -532,21 +534,21 @@ function SuspendForm({ user, onDone }: { user: AdminUser; onDone: () => void }) 
               </NativeSelectOption>
             ))}
           </NativeSelect>
-        </div>
+        </Field>
       </div>
 
-      <div className="flex flex-col gap-1">
-        <Label htmlFor={`note-${user.publicId}`} className="text-xs">
+      <Field className="gap-1">
+        <FieldLabel htmlFor={`note-${user.publicId}`} className="text-xs">
           {t('admin.suspendNote')}
-        </Label>
+        </FieldLabel>
         <Textarea
           id={`note-${user.publicId}`}
           value={note}
           maxLength={2000}
           onChange={(event) => setNote(event.target.value)}
         />
-        <FieldHint>{t('admin.suspendNoteHint')}</FieldHint>
-      </div>
+        <FieldDescription>{t('admin.suspendNoteHint')}</FieldDescription>
+      </Field>
 
       {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
 
@@ -652,10 +654,10 @@ function TierControl({
 
   return (
     <div className="flex items-end gap-2">
-      <div className="flex flex-col gap-1">
-        <Label htmlFor={`tier-${user.publicId}`} className="text-xs">
+      <Field className="gap-1">
+        <FieldLabel htmlFor={`tier-${user.publicId}`} className="text-xs">
           {t('admin.setTier')}
-        </Label>
+        </FieldLabel>
         <NativeSelect
           id={`tier-${user.publicId}`}
           value={String(draft)}
@@ -667,7 +669,7 @@ function TierControl({
             </NativeSelectOption>
           ))}
         </NativeSelect>
-      </div>
+      </Field>
       <Button
         size="sm"
         variant="outline"
@@ -880,26 +882,26 @@ function Categories() {
           void run(() => taxonomy.createCategory(name.trim()), () => setName(''));
         }}
       >
-        <div className="flex min-w-48 flex-1 flex-col gap-1">
-          <Label htmlFor="category-new" className="text-xs">
+        <Field className="min-w-48 flex-1 gap-1">
+          <FieldLabel htmlFor="category-new" className="text-xs">
             {t('admin.categoryName')}
-          </Label>
+          </FieldLabel>
           <Input
             id="category-new"
             value={name}
             maxLength={48}
             onChange={(event) => setName(event.target.value)}
           />
-        </div>
+        </Field>
         <Button size="sm" type="submit" disabled={busy || newSlug === ''}>
           {t('admin.newCategory')}
         </Button>
         {name.trim() === '' ? null : (
-          <FieldHint className={newSlug === '' ? 'w-full text-destructive' : 'w-full'}>
+          <FieldDescription className={newSlug === '' ? 'w-full text-destructive' : 'w-full'}>
             {newSlug === ''
               ? t('admin.categoryNoSlug')
               : t('admin.categoryAddress', { slug: newSlug })}
-          </FieldHint>
+          </FieldDescription>
         )}
       </form>
 
@@ -930,10 +932,10 @@ function Categories() {
                       );
                     }}
                   >
-                    <div className="flex min-w-48 flex-1 flex-col gap-1">
-                      <Label htmlFor={`category-name-${category.slug}`} className="text-xs">
+                    <Field className="min-w-48 flex-1 gap-1">
+                      <FieldLabel htmlFor={`category-name-${category.slug}`} className="text-xs">
                         {t('admin.categoryName')}
-                      </Label>
+                      </FieldLabel>
                       <Input
                         id={`category-name-${category.slug}`}
                         autoFocus
@@ -946,7 +948,7 @@ function Categories() {
                           if (event.key === 'Escape') setRenaming(null);
                         }}
                       />
-                    </div>
+                    </Field>
                     <Button
                       size="sm"
                       type="submit"
@@ -1025,10 +1027,10 @@ function Categories() {
                         <p className="text-sm">
                           {t('admin.categoryDeleteMove', { name: category.name })}
                         </p>
-                        <div className="flex flex-col gap-1">
-                          <Label htmlFor={`category-move-${category.slug}`} className="text-xs">
+                        <Field className="gap-1">
+                          <FieldLabel htmlFor={`category-move-${category.slug}`} className="text-xs">
                             {t('admin.categoryMoveTo')}
-                          </Label>
+                          </FieldLabel>
                           <NativeSelect
                             id={`category-move-${category.slug}`}
                             value={deleting.moveTo}
@@ -1042,7 +1044,7 @@ function Categories() {
                               </NativeSelectOption>
                             ))}
                           </NativeSelect>
-                        </div>
+                        </Field>
                       </>
                     )}
 
@@ -1171,10 +1173,10 @@ function InviteEditor({
         if (event.key === 'Escape') onCancel();
       }}
     >
-      <div className="flex flex-col gap-1">
-        <Label htmlFor={`invite-edit-note-${invite.id}`} className="text-xs">
+      <Field className="gap-1">
+        <FieldLabel htmlFor={`invite-edit-note-${invite.id}`} className="text-xs">
           {t('admin.inviteNote')}
-        </Label>
+        </FieldLabel>
         <Input
           id={`invite-edit-note-${invite.id}`}
           autoFocus
@@ -1182,12 +1184,12 @@ function InviteEditor({
           maxLength={200}
           onChange={(event) => setNote(event.target.value)}
         />
-      </div>
+      </Field>
       <div className="flex flex-wrap gap-3">
-        <div className="flex w-40 flex-col gap-1">
-          <Label htmlFor={`invite-edit-uses-${invite.id}`} className="text-xs">
+        <Field className="w-40 gap-1">
+          <FieldLabel htmlFor={`invite-edit-uses-${invite.id}`} className="text-xs">
             {t('admin.inviteMaxUses')}
-          </Label>
+          </FieldLabel>
           <Input
             id={`invite-edit-uses-${invite.id}`}
             type="number"
@@ -1197,11 +1199,11 @@ function InviteEditor({
             value={maxUses}
             onChange={(event) => setMaxUses(event.target.value)}
           />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor={`invite-edit-expires-${invite.id}`} className="text-xs">
+        </Field>
+        <Field className="gap-1">
+          <FieldLabel htmlFor={`invite-edit-expires-${invite.id}`} className="text-xs">
             {t('admin.inviteExpiresAt')}
-          </Label>
+          </FieldLabel>
           <Input
             id={`invite-edit-expires-${invite.id}`}
             type="datetime-local"
@@ -1209,20 +1211,21 @@ function InviteEditor({
             disabled={never}
             onChange={(event) => setExpires(event.target.value)}
           />
-        </div>
-        <label className="flex items-center gap-2 self-end pb-2 text-sm">
-          <input
-            type="checkbox"
-            className="accent-primary"
+        </Field>
+        <Field orientation="horizontal" className="self-end pb-2">
+          <Checkbox
+            id={`invite-edit-never-${invite.id}`}
             checked={never}
-            onChange={(event) => setNever(event.target.checked)}
+            onCheckedChange={(next) => setNever(next === true)}
           />
-          {t('admin.inviteNeverExpires')}
-        </label>
+          <FieldLabel htmlFor={`invite-edit-never-${invite.id}`} className="leading-5 font-normal">
+            {t('admin.inviteNeverExpires')}
+          </FieldLabel>
+        </Field>
       </div>
-      <FieldHint className={usesValid ? undefined : 'text-destructive'}>
+      <FieldDescription className={usesValid ? undefined : 'text-destructive'}>
         {used > 1 ? t('admin.inviteMaxUsesFloor', { count: used }) : t('admin.inviteMaxUsesHint')}
-      </FieldHint>
+      </FieldDescription>
       <div className="flex gap-2">
         <Button size="sm" type="submit" disabled={busy || !usesValid || !expiryValid}>
           {t('admin.save')}
@@ -1296,21 +1299,21 @@ function Invites() {
         }}
       >
         <div className="flex flex-wrap items-end gap-2">
-          <div className="flex min-w-48 flex-1 flex-col gap-1">
-            <Label htmlFor="invite-note" className="text-xs">
+          <Field className="min-w-48 flex-1 gap-1">
+            <FieldLabel htmlFor="invite-note" className="text-xs">
               {t('admin.inviteNote')}
-            </Label>
+            </FieldLabel>
             <Input
               id="invite-note"
               value={note}
               maxLength={200}
               onChange={(event) => setNote(event.target.value)}
             />
-          </div>
-          <div className="flex w-28 flex-col gap-1">
-            <Label htmlFor="invite-max-uses" className="text-xs">
+          </Field>
+          <Field className="w-28 gap-1">
+            <FieldLabel htmlFor="invite-max-uses" className="text-xs">
               {t('admin.inviteMaxUses')}
-            </Label>
+            </FieldLabel>
             <Input
               id="invite-max-uses"
               type="number"
@@ -1320,11 +1323,11 @@ function Invites() {
               value={maxUses}
               onChange={(event) => setMaxUses(event.target.value)}
             />
-          </div>
-          <div className="flex w-36 flex-col gap-1">
-            <Label htmlFor="invite-ttl" className="text-xs">
+          </Field>
+          <Field className="w-36 gap-1">
+            <FieldLabel htmlFor="invite-ttl" className="text-xs">
               {t('admin.inviteTtlDays')}
-            </Label>
+            </FieldLabel>
             <Input
               id="invite-ttl"
               type="number"
@@ -1335,26 +1338,23 @@ function Invites() {
               disabled={never}
               onChange={(event) => setTtlDays(event.target.value)}
             />
-          </div>
-          <label className="flex items-center gap-2 pb-2 text-sm">
-            <input
-              type="checkbox"
-              className="accent-primary"
-              checked={never}
-              onChange={(event) => setNever(event.target.checked)}
-            />
-            {t('admin.inviteNeverExpires')}
-          </label>
+          </Field>
+          <Field orientation="horizontal" className="pb-2">
+            <Checkbox id="invite-never" checked={never} onCheckedChange={(next) => setNever(next === true)} />
+            <FieldLabel htmlFor="invite-never" className="leading-5 font-normal">
+              {t('admin.inviteNeverExpires')}
+            </FieldLabel>
+          </Field>
           <Button size="sm" type="submit" disabled={busy || !canIssue}>
             {t('admin.newInvite')}
           </Button>
         </div>
-        <FieldHint className={parsedUses === undefined ? 'text-destructive' : undefined}>
+        <FieldDescription className={parsedUses === undefined ? 'text-destructive' : undefined}>
           {t('admin.inviteMaxUsesHint')} {never ? null : t('admin.inviteTtlHint')}
-        </FieldHint>
+        </FieldDescription>
         {/* The defaults are the only shape where a leaked code costs at most
             one account. Anything wider is allowed, but said out loud. */}
-        {wide ? <FieldHint className="text-destructive">{t('admin.inviteWideWarning')}</FieldHint> : null}
+        {wide ? <FieldDescription className="text-destructive">{t('admin.inviteWideWarning')}</FieldDescription> : null}
       </form>
 
       {error === null ? null : <p className="text-sm text-destructive">{error}</p>}

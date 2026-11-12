@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { FieldHint } from '@/components/ui/field';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import type { Tag } from '@/domain/link';
 import { t } from '@/i18n/t';
 import { cn } from '@/lib/utils';
@@ -68,31 +68,29 @@ export function TagPicker({
   }
 
   return (
-    <fieldset className="flex flex-col gap-3">
-      <legend className="text-sm font-medium">{t('submit.tags')}</legend>
+    <FieldSet className="gap-3">
+      <FieldLegend variant="label">{t('submit.tags')}</FieldLegend>
       <div className={cn('flex flex-wrap gap-2', listClassName)}>
         {available.map((tag) => {
           const checked = slugs.includes(tag.slug);
           return (
-            <label
+            <FieldLabel
               key={tag.slug}
               title={tag.pending ? t('tag.pendingTitle') : undefined}
               className={cn(
-                'flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs has-checked:border-primary has-checked:bg-accent',
+                'cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs leading-4 font-normal',
                 tag.pending && 'border-dashed',
               )}
             >
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={checked}
-                onChange={() =>
+                onCheckedChange={() =>
                   onSlugsChange(checked ? slugs.filter((slug) => slug !== tag.slug) : [...slugs, tag.slug])
                 }
-                className="accent-primary"
               />
               #{tag.name}
               {tag.pending ? <span className="text-muted-foreground">{t('tag.pending')}</span> : null}
-            </label>
+            </FieldLabel>
           );
         })}
       </div>
@@ -118,8 +116,8 @@ export function TagPicker({
         </ul>
       )}
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={`${id}-new-tag`}>{t('submit.newTag')}</Label>
+      <Field>
+        <FieldLabel htmlFor={`${id}-new-tag`}>{t('submit.newTag')}</FieldLabel>
         <div className="flex gap-2">
           <Input
             id={`${id}-new-tag`}
@@ -143,14 +141,14 @@ export function TagPicker({
             {t('submit.addTag')}
           </Button>
         </div>
-        <FieldHint>
+        <FieldDescription>
           {invalid
             ? t('submit.newTagInvalid')
             : creates
               ? t('submit.newTagHelpCreate')
               : t('submit.newTagHelp')}
-        </FieldHint>
-      </div>
-    </fieldset>
+        </FieldDescription>
+      </Field>
+    </FieldSet>
   );
 }

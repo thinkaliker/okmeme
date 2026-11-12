@@ -5,9 +5,10 @@ import { admin, auth, me as meApi } from '@/api/endpoints';
 import { RecoveryCodes } from '@/components/RecoveryCodes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FieldHint } from '@/components/ui/field';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useDisplay } from '@/display/DisplayProvider';
@@ -52,32 +53,29 @@ interface ChoiceProps<T extends string> {
   onChange: (value: T) => void;
 }
 
-/** A radio group, because these are exclusive choices and a native radio already
+/** A radio group, because these are exclusive choices and a radio group already
  *  knows how to be one: arrow keys, a single tab stop, a label per option. */
 function Choice<T extends string>({ name, legend, hint, value, options, onChange }: ChoiceProps<T>) {
   return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="text-sm">{legend}</legend>
-      <div className="flex flex-wrap gap-2">
+    <FieldSet>
+      <FieldLegend variant="label" className="font-normal">
+        {legend}
+      </FieldLegend>
+      <RadioGroup
+        name={name}
+        value={value}
+        onValueChange={(next) => onChange(next as T)}
+        className="flex flex-wrap gap-2"
+      >
         {(Object.keys(options) as T[]).map((option) => (
-          <label
-            key={option}
-            className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm has-checked:border-primary has-checked:bg-accent"
-          >
-            <input
-              type="radio"
-              name={name}
-              value={option}
-              checked={value === option}
-              onChange={() => onChange(option)}
-              className="accent-primary"
-            />
+          <FieldLabel key={option} className="cursor-pointer items-center rounded-md border border-border px-3 py-1.5 text-sm leading-5 font-normal">
+            <RadioGroupItem value={option} />
             {options[option]}
-          </label>
+          </FieldLabel>
         ))}
-      </div>
-      {hint === undefined ? null : <FieldHint>{hint}</FieldHint>}
-    </fieldset>
+      </RadioGroup>
+      {hint === undefined ? null : <FieldDescription>{hint}</FieldDescription>}
+    </FieldSet>
   );
 }
 
@@ -178,16 +176,16 @@ export default function SettingsRoute() {
         <h2 id="content-heading" className="text-sm font-semibold">
           {t('settings.content')}
         </h2>
-        <div className="flex items-center gap-3">
+        <Field orientation="horizontal" className="gap-3">
           <Switch
             id="show-nsfw"
             checked={me.showNsfw}
             disabled={!can.seeNsfw(tier)}
             onCheckedChange={changeNsfw}
           />
-          <Label htmlFor="show-nsfw">{t('settings.showNsfw')}</Label>
-        </div>
-        {can.seeNsfw(tier) ? null : <FieldHint>{t('settings.showNsfwUnavailable')}</FieldHint>}
+          <FieldLabel htmlFor="show-nsfw">{t('settings.showNsfw')}</FieldLabel>
+        </Field>
+        {can.seeNsfw(tier) ? null : <FieldDescription>{t('settings.showNsfwUnavailable')}</FieldDescription>}
       </section>
 
       <section aria-labelledby="account-heading" className="flex flex-col gap-3">
@@ -210,7 +208,7 @@ export default function SettingsRoute() {
           <Button variant="outline" size="sm" onClick={() => void regenerate()}>
             {t('settings.regenerate')}
           </Button>
-          <FieldHint className="mt-1">{t('settings.regenerateHelp')}</FieldHint>
+          <FieldDescription className="mt-1">{t('settings.regenerateHelp')}</FieldDescription>
         </div>
 
         {/* Ten codes, shown once. On an instance with no email these are the
@@ -247,7 +245,7 @@ export default function SettingsRoute() {
                 maxLength={2000}
                 onChange={(event) => setAppealBody(event.target.value)}
               />
-              <FieldHint>{t('sanction.appealOnce')}</FieldHint>
+              <FieldDescription>{t('sanction.appealOnce')}</FieldDescription>
               <div>
                 <Button size="sm" disabled={appealBody.trim() === ''} onClick={() => void sendAppeal()}>
                   {t('sanction.appeal')}
@@ -326,8 +324,8 @@ function PermissionsSection() {
       <h2 id="permissions-heading" className="text-sm font-semibold">
         {t('permission.title')}
       </h2>
-      <FieldHint>{t('permission.intro')}</FieldHint>
-      {editor ? <FieldHint>{t('permission.editHint')}</FieldHint> : null}
+      <FieldDescription>{t('permission.intro')}</FieldDescription>
+      {editor ? <FieldDescription>{t('permission.editHint')}</FieldDescription> : null}
 
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full border-collapse text-sm">
@@ -373,13 +371,12 @@ function PermissionsSection() {
                 {row.cells.map((cell) => (
                   <td key={cell.tier} className="px-2 py-2 text-center">
                     {cell.editable ? (
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={cell.granted}
                         disabled={saving}
                         aria-labelledby={`perm-row-${row.capability} perm-col-${cell.tier}`}
-                        onChange={(event) => void toggle(cell.tier, row.capability, event.target.checked)}
-                        className="size-4 cursor-pointer accent-primary align-middle"
+                        onCheckedChange={(next) => void toggle(cell.tier, row.capability, next === true)}
+                        className="cursor-pointer align-middle"
                       />
                     ) : (
                       <span title={cell.granted ? t('permission.granted') : t('permission.denied')}>
@@ -435,10 +432,10 @@ function SecuritySection() {
       </h2>
 
       <div className="flex flex-wrap items-end gap-2">
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="current-password" className="text-xs">
+        <Field className="gap-1">
+          <FieldLabel htmlFor="current-password" className="text-xs">
             {t('auth.currentPassword')}
-          </Label>
+          </FieldLabel>
           <Input
             id="current-password"
             type="password"
@@ -446,11 +443,11 @@ function SecuritySection() {
             value={current}
             onChange={(event) => setCurrent(event.target.value)}
           />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="next-password" className="text-xs">
+        </Field>
+        <Field className="gap-1">
+          <FieldLabel htmlFor="next-password" className="text-xs">
             {t('auth.newPassword')}
-          </Label>
+          </FieldLabel>
           <Input
             id="next-password"
             type="password"
@@ -459,7 +456,7 @@ function SecuritySection() {
             value={next}
             onChange={(event) => setNext(event.target.value)}
           />
-        </div>
+        </Field>
         <Button
           size="sm"
           disabled={current === '' || next.length < 10}
@@ -470,7 +467,7 @@ function SecuritySection() {
       </div>
 
       {/* Changing a password revokes every other session and every token. */}
-      {state === 'done' ? <FieldHint>{t('auth.passwordChanged')}</FieldHint> : null}
+      {state === 'done' ? <FieldDescription>{t('auth.passwordChanged')}</FieldDescription> : null}
       {state === 'failed' ? <p className="text-sm text-destructive">{t('auth.failed')}</p> : null}
     </section>
   );
@@ -507,7 +504,7 @@ function TokensSection() {
       {/* A token carries exactly its issuer's tier. There is no narrower scope,
           because a token with fewer rights than its owner is a promise the ring
           model cannot keep. */}
-      <FieldHint>{t('settings.tokensHint')}</FieldHint>
+      <FieldDescription>{t('settings.tokensHint')}</FieldDescription>
 
       {issued === null ? null : (
         <div className="flex flex-col gap-2 rounded-lg border border-primary/40 bg-accent/40 p-3">
@@ -548,12 +545,12 @@ function TokensSection() {
       </ul>
 
       <div className="flex flex-wrap items-end gap-2">
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="token-name" className="text-xs">
+        <Field className="gap-1">
+          <FieldLabel htmlFor="token-name" className="text-xs">
             {t('settings.tokenName')}
-          </Label>
+          </FieldLabel>
           <Input id="token-name" value={name} onChange={(event) => setName(event.target.value)} />
-        </div>
+        </Field>
         <Button size="sm" disabled={name.trim() === ''} onClick={() => void create()}>
           {t('settings.newToken')}
         </Button>
@@ -581,18 +578,18 @@ function DangerZone({ username }: { username: string }) {
       </h2>
       {/* A tombstone, not a delete: the posts stay, pinned at their current
           tier, so the visibility join still has something to resolve against. */}
-      <FieldHint>{t('settings.deleteHint')}</FieldHint>
+      <FieldDescription>{t('settings.deleteHint')}</FieldDescription>
       <div className="flex flex-wrap items-end gap-2">
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="delete-confirm" className="text-xs">
+        <Field className="gap-1">
+          <FieldLabel htmlFor="delete-confirm" className="text-xs">
             {t('settings.deleteConfirm')}
-          </Label>
+          </FieldLabel>
           <Input
             id="delete-confirm"
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
           />
-        </div>
+        </Field>
         <Button
           size="sm"
           variant="destructive"

@@ -5,9 +5,9 @@ import { ApiError } from '@/api/client';
 import { TagPicker } from '@/components/TagPicker';
 import { VisibilityChoice } from '@/components/VisibilityChoice';
 import { Button } from '@/components/ui/button';
-import { FieldHint } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -116,31 +116,26 @@ export default function SubmitRoute() {
     <form className="flex max-w-2xl flex-col gap-5" onSubmit={(event) => void submit(event)}>
       <h1 className="text-lg font-semibold">{t('submit.title')}</h1>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-medium">{t('submit.kind')}</legend>
-        <div className="flex gap-2">
+      <FieldSet>
+        <FieldLegend variant="label">{t('submit.kind')}</FieldLegend>
+        <RadioGroup
+          name="kind"
+          value={kind}
+          onValueChange={(next) => setKind(next as LinkKind)}
+          className="flex gap-2"
+        >
           {KINDS.map((value) => (
-            <label
-              key={value}
-              className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm has-checked:border-primary has-checked:bg-accent"
-            >
-              <input
-                type="radio"
-                name="kind"
-                value={value}
-                checked={kind === value}
-                onChange={() => setKind(value)}
-                className="accent-primary"
-              />
+            <FieldLabel key={value} className="cursor-pointer items-center rounded-md border border-border px-3 py-1.5 text-sm leading-5 font-normal">
+              <RadioGroupItem value={value} />
               {KIND_LABEL[value]}
-            </label>
+            </FieldLabel>
           ))}
-        </div>
-      </fieldset>
+        </RadioGroup>
+      </FieldSet>
 
       {kind === 'text' ? null : (
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="submit-url">{t('submit.url')}</Label>
+        <Field>
+          <FieldLabel htmlFor="submit-url">{t('submit.url')}</FieldLabel>
           <div className="flex gap-2">
             <Input
               id="submit-url"
@@ -158,7 +153,7 @@ export default function SubmitRoute() {
               {checking ? t('submit.checking') : t('submit.check')}
             </Button>
           </div>
-          <FieldHint>{t('submit.noUpload')}</FieldHint>
+          <FieldDescription>{t('submit.noUpload')}</FieldDescription>
           {/* Dedup is scoped to what this submitter can already see. A global
               check would confirm the existence of content they are not allowed
               to know about. */}
@@ -170,11 +165,11 @@ export default function SubmitRoute() {
               </RouterLink>
             </p>
           ) : null}
-        </div>
+        </Field>
       )}
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="submit-title">{t('submit.titleField')}</Label>
+      <Field>
+        <FieldLabel htmlFor="submit-title">{t('submit.titleField')}</FieldLabel>
         <Input
           id="submit-title"
           required
@@ -182,22 +177,22 @@ export default function SubmitRoute() {
           value={title}
           onChange={(event) => setTitle(event.target.value)}
         />
-      </div>
+      </Field>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="submit-body">
+      <Field>
+        <FieldLabel htmlFor="submit-body">
           {kind === 'text' ? t('submit.body') : t('submit.bodyOptional')}
-        </Label>
+        </FieldLabel>
         <Textarea
           id="submit-body"
           required={kind === 'text'}
           value={body}
           onChange={(event) => setBody(event.target.value)}
         />
-      </div>
+      </Field>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="submit-category">{t('submit.category')}</Label>
+      <Field>
+        <FieldLabel htmlFor="submit-category">{t('submit.category')}</FieldLabel>
         <NativeSelect
           id="submit-category"
           value={categorySlug}
@@ -209,7 +204,7 @@ export default function SubmitRoute() {
             </NativeSelectOption>
           ))}
         </NativeSelect>
-      </div>
+      </Field>
 
       <TagPicker
         id="submit"
@@ -232,13 +227,13 @@ export default function SubmitRoute() {
       ) : null}
 
       {allows('postNsfw') ? (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-3">
+        <Field>
+          <Field orientation="horizontal" className="gap-3">
             <Switch id="submit-nsfw" checked={isNsfw} onCheckedChange={setIsNsfw} />
-            <Label htmlFor="submit-nsfw">{t('submit.nsfw')}</Label>
-          </div>
-          <FieldHint>{t('submit.nsfwHelp')}</FieldHint>
-        </div>
+            <FieldLabel htmlFor="submit-nsfw">{t('submit.nsfw')}</FieldLabel>
+          </Field>
+          <FieldDescription>{t('submit.nsfwHelp')}</FieldDescription>
+        </Field>
       ) : null}
 
       {error === null ? null : <p className="text-sm text-destructive">{error}</p>}

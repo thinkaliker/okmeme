@@ -4,9 +4,8 @@ import { ApiError } from '@/api/client';
 import { auth } from '@/api/endpoints';
 import { RecoveryCodes } from '@/components/RecoveryCodes';
 import { Button } from '@/components/ui/button';
-import { FieldHint } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { t } from '@/i18n/t';
 import { useSession } from '@/session/SessionProvider';
 
@@ -65,19 +64,19 @@ export default function SignupRoute() {
       <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
         <h1 className="text-lg font-semibold">{t('auth.signupTitle')}</h1>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="signup-invite">{t('auth.inviteCode')}</Label>
+        <Field>
+          <FieldLabel htmlFor="signup-invite">{t('auth.inviteCode')}</FieldLabel>
           <Input
             id="signup-invite"
             required
             value={invite}
             onChange={(event) => setInvite(event.target.value)}
           />
-          <FieldHint>{t('auth.inviteHint')}</FieldHint>
-        </div>
+          <FieldDescription>{t('auth.inviteHint')}</FieldDescription>
+        </Field>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="signup-username">{t('auth.username')}</Label>
+        <Field>
+          <FieldLabel htmlFor="signup-username">{t('auth.username')}</FieldLabel>
           <Input
             id="signup-username"
             autoComplete="username"
@@ -85,10 +84,10 @@ export default function SignupRoute() {
             value={username}
             onChange={(event) => setUsername(event.target.value)}
           />
-        </div>
+        </Field>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="signup-password">{t('auth.password')}</Label>
+        <Field>
+          <FieldLabel htmlFor="signup-password">{t('auth.password')}</FieldLabel>
           <Input
             id="signup-password"
             type="password"
@@ -98,11 +97,11 @@ export default function SignupRoute() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
-          <FieldHint>{t('auth.passwordHint')}</FieldHint>
-        </div>
+          <FieldDescription>{t('auth.passwordHint')}</FieldDescription>
+        </Field>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="signup-confirm">{t('auth.confirmPassword')}</Label>
+        <Field>
+          <FieldLabel htmlFor="signup-confirm">{t('auth.confirmPassword')}</FieldLabel>
           <Input
             id="signup-confirm"
             type="password"
@@ -111,7 +110,7 @@ export default function SignupRoute() {
             value={confirm}
             onChange={(event) => setConfirm(event.target.value)}
           />
-        </div>
+        </Field>
 
         {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
 

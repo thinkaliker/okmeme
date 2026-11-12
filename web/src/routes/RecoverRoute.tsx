@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { auth } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';
-import { FieldHint } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { t } from '@/i18n/t';
 import { useSession } from '@/session/SessionProvider';
@@ -64,8 +63,8 @@ export default function RecoverRoute() {
       <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
         <h1 className="text-lg font-semibold">{t('auth.recoverTitle')}</h1>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="recover-username">{t('auth.username')}</Label>
+        <Field>
+          <FieldLabel htmlFor="recover-username">{t('auth.username')}</FieldLabel>
           <Input
             id="recover-username"
             autoComplete="username"
@@ -73,21 +72,21 @@ export default function RecoverRoute() {
             value={username}
             onChange={(event) => setUsername(event.target.value)}
           />
-        </div>
+        </Field>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="recover-code">{t('auth.recoveryCode')}</Label>
+        <Field>
+          <FieldLabel htmlFor="recover-code">{t('auth.recoveryCode')}</FieldLabel>
           <Input
             id="recover-code"
             required
             value={code}
             onChange={(event) => setCode(event.target.value)}
           />
-          <FieldHint>{t('auth.recoverHint')}</FieldHint>
-        </div>
+          <FieldDescription>{t('auth.recoverHint')}</FieldDescription>
+        </Field>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="recover-password">{t('auth.newPassword')}</Label>
+        <Field>
+          <FieldLabel htmlFor="recover-password">{t('auth.newPassword')}</FieldLabel>
           <Input
             id="recover-password"
             type="password"
@@ -97,7 +96,7 @@ export default function RecoverRoute() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
-        </div>
+        </Field>
 
         {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
 
@@ -119,24 +118,24 @@ export default function RecoverRoute() {
           <p className="text-sm">{t('auth.recoverySent')}</p>
         ) : (
           <form className="flex flex-col gap-3" onSubmit={(event) => void requestHelp(event)}>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="request-username">{t('auth.username')}</Label>
+            <Field>
+              <FieldLabel htmlFor="request-username">{t('auth.username')}</FieldLabel>
               <Input
                 id="request-username"
                 required
                 value={requestUsername}
                 onChange={(event) => setRequestUsername(event.target.value)}
               />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="request-note">{t('auth.recoveryNote')}</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="request-note">{t('auth.recoveryNote')}</FieldLabel>
               <Textarea
                 id="request-note"
                 maxLength={2000}
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
               />
-            </div>
+            </Field>
             <div>
               <Button type="submit" size="sm" variant="outline">
                 {t('auth.requestRecovery')}

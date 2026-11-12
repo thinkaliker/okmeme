@@ -74,7 +74,7 @@ describe('LinkCard', () => {
     // Re-tier is admin-only and the payload said no.
     expect(screen.queryByLabelText(/pin to tier/i)).toBeNull();
     // The post's own tags are ticked, ready to be kept or dropped.
-    expect((screen.getByRole('checkbox', { name: /#mine/ }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole('checkbox', { name: /#mine/ }).getAttribute('aria-checked')).toBe('true');
     expect(dialog.textContent).toMatch(/someone else/i);
   });
 

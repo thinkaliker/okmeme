@@ -4,9 +4,8 @@ import { ApiError } from '@/api/client';
 import { setup, type SetupResult } from '@/api/endpoints';
 import { RecoveryCodes } from '@/components/RecoveryCodes';
 import { Button } from '@/components/ui/button';
-import { FieldHint } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { t } from '@/i18n/t';
 
@@ -97,15 +96,15 @@ export default function SetupRoute() {
         <p className="mt-1 text-sm text-muted-foreground">{t('setup.body')}</p>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="setup-token">{t('setup.token')}</Label>
+      <Field>
+        <FieldLabel htmlFor="setup-token">{t('setup.token')}</FieldLabel>
         <Input
           id="setup-token"
           value={token}
           onChange={(event) => setToken(event.target.value)}
         />
-        <FieldHint>{t('setup.tokenHint')}</FieldHint>
-      </div>
+        <FieldDescription>{t('setup.tokenHint')}</FieldDescription>
+      </Field>
 
       {available === false ? (
         <div className="rounded-lg border border-dashed border-border p-6 text-center">
@@ -114,17 +113,17 @@ export default function SetupRoute() {
         </div>
       ) : available === null ? null : (
         <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="setup-owner-username">{t('setup.ownerUsername')}</Label>
+          <Field>
+            <FieldLabel htmlFor="setup-owner-username">{t('setup.ownerUsername')}</FieldLabel>
             <Input
               id="setup-owner-username"
               required
               value={ownerUsername}
               onChange={(event) => setOwnerUsername(event.target.value)}
             />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="setup-owner-password">{t('setup.ownerPassword')}</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="setup-owner-password">{t('setup.ownerPassword')}</FieldLabel>
             <Input
               id="setup-owner-password"
               type="password"
@@ -133,19 +132,19 @@ export default function SetupRoute() {
               value={ownerPassword}
               onChange={(event) => setOwnerPassword(event.target.value)}
             />
-          </div>
+          </Field>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="setup-admin-username">{t('setup.adminUsername')}</Label>
+          <Field>
+            <FieldLabel htmlFor="setup-admin-username">{t('setup.adminUsername')}</FieldLabel>
             <Input
               id="setup-admin-username"
               required
               value={adminUsername}
               onChange={(event) => setAdminUsername(event.target.value)}
             />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="setup-admin-password">{t('setup.adminPassword')}</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="setup-admin-password">{t('setup.adminPassword')}</FieldLabel>
             <Input
               id="setup-admin-password"
               type="password"
@@ -154,27 +153,27 @@ export default function SetupRoute() {
               value={adminPassword}
               onChange={(event) => setAdminPassword(event.target.value)}
             />
-            <FieldHint>{t('auth.passwordHint')}</FieldHint>
-          </div>
+            <FieldDescription>{t('auth.passwordHint')}</FieldDescription>
+          </Field>
 
           {/* The one instance setting worth asking about here, because the
               answer depends on whether a blob store was configured — which is
               known now and nowhere else. Everything else waits for the admin
               panel, and so does changing this. */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-3">
+          <Field>
+            <Field orientation="horizontal" className="gap-3">
               <Switch
                 id="setup-thumbnails"
                 checked={thumbnails && blobStore !== false}
                 disabled={blobStore === false}
                 onCheckedChange={setThumbnails}
               />
-              <Label htmlFor="setup-thumbnails">{t('setup.thumbnails')}</Label>
-            </div>
-            <FieldHint>
+              <FieldLabel htmlFor="setup-thumbnails">{t('setup.thumbnails')}</FieldLabel>
+            </Field>
+            <FieldDescription>
               {blobStore === false ? t('setup.thumbnailsNoStore') : t('setup.thumbnailsHint')}
-            </FieldHint>
-          </div>
+            </FieldDescription>
+          </Field>
 
           {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
 

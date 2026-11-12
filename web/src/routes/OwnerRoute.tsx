@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { ApiError } from '@/api/client';
 import { owner } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';
-import { FieldHint } from '@/components/ui/field';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import type { InstanceSetting, Owner } from '@/domain/admin';
 import { TIER, can } from '@/domain/tier';
@@ -115,18 +115,18 @@ export default function OwnerRoute() {
         </ul>
 
         <div className="flex flex-wrap items-end gap-2">
-          <div className="flex min-w-48 flex-1 flex-col gap-1">
-            <Label htmlFor="owner-add" className="text-xs">
+          <Field className="min-w-48 flex-1 gap-1">
+            <FieldLabel htmlFor="owner-add" className="text-xs">
               {t('owner.add')}
-            </Label>
+            </FieldLabel>
             <Input
               id="owner-add"
               value={publicId}
               placeholder="u_…"
               onChange={(event) => setPublicId(event.target.value)}
             />
-            <FieldHint>{t('owner.addHint')}</FieldHint>
-          </div>
+            <FieldDescription>{t('owner.addHint')}</FieldDescription>
+          </Field>
           <Button size="sm" onClick={() => void run(() => owner.add(publicId))}>
             {t('owner.add')}
           </Button>
@@ -138,8 +138,8 @@ export default function OwnerRoute() {
           {t('owner.settings')}
         </h2>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="invite-min-tier">{t('owner.inviteMinTier')}</Label>
+        <Field className="gap-2">
+          <FieldLabel htmlFor="invite-min-tier">{t('owner.inviteMinTier')}</FieldLabel>
           <NativeSelect
             id="invite-min-tier"
             value={String(minTier)}
@@ -159,15 +159,16 @@ export default function OwnerRoute() {
           {dangerous ? (
             <div className="flex flex-col gap-2 rounded-md border border-destructive/50 bg-destructive/5 p-3">
               <p className="text-sm">{t('owner.inviteMinTierWarning')}</p>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="accent-primary"
+              <Field orientation="horizontal">
+                <Checkbox
+                  id="invite-min-tier-confirm"
                   checked={confirm}
-                  onChange={(event) => setConfirm(event.target.checked)}
+                  onCheckedChange={(next) => setConfirm(next === true)}
                 />
-                {t('owner.confirm')}
-              </label>
+                <FieldLabel htmlFor="invite-min-tier-confirm" className="leading-5 font-normal">
+                  {t('owner.confirm')}
+                </FieldLabel>
+              </Field>
             </div>
           ) : null}
 
@@ -176,7 +177,7 @@ export default function OwnerRoute() {
               {t('admin.save')}
             </Button>
           </div>
-        </div>
+        </Field>
 
         {settings.length === 0 ? null : (
           <ul className="flex flex-col gap-1 text-xs text-muted-foreground">

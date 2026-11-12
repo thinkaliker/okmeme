@@ -12,9 +12,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { FieldHint } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -237,8 +236,8 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
           >
             {can.edit ? (
               <>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={id('title')}>{t('linkEdit.postTitle')}</Label>
+                <Field>
+                  <FieldLabel htmlFor={id('title')}>{t('linkEdit.postTitle')}</FieldLabel>
                   <Input
                     id={id('title')}
                     value={title}
@@ -246,10 +245,10 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
                     required
                     onChange={(event) => setTitle(event.target.value)}
                   />
-                </div>
+                </Field>
 
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={id('body')}>{t('linkEdit.body')}</Label>
+                <Field>
+                  <FieldLabel htmlFor={id('body')}>{t('linkEdit.body')}</FieldLabel>
                   <Textarea
                     id={id('body')}
                     value={body}
@@ -257,10 +256,10 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
                     required={link.kind === 'text'}
                     onChange={(event) => setBody(event.target.value)}
                   />
-                </div>
+                </Field>
 
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={id('category')}>{t('linkEdit.category')}</Label>
+                <Field>
+                  <FieldLabel htmlFor={id('category')}>{t('linkEdit.category')}</FieldLabel>
                   <NativeSelect
                     id={id('category')}
                     value={categorySlug}
@@ -272,7 +271,7 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
                       </NativeSelectOption>
                     ))}
                   </NativeSelect>
-                </div>
+                </Field>
 
                 <TagPicker
                   id={id('tags')}
@@ -286,15 +285,15 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
                 />
 
                 {allows('postNsfw') || link.isNsfw ? (
-                  <div className="flex items-center gap-3">
+                  <Field orientation="horizontal" className="gap-3">
                     <Switch
                       id={id('nsfw')}
                       checked={isNsfw}
                       disabled={nsfwLocked}
                       onCheckedChange={setIsNsfw}
                     />
-                    <Label htmlFor={id('nsfw')}>{t('linkEdit.nsfw')}</Label>
-                  </div>
+                    <FieldLabel htmlFor={id('nsfw')}>{t('linkEdit.nsfw')}</FieldLabel>
+                  </Field>
                 ) : null}
               </>
             ) : null}
@@ -335,8 +334,8 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
             {can.remove ? (
               <div className="flex flex-col gap-2">
                 {can.moderate ? (
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor={id('reason')}>{t('linkEdit.removeReason')}</Label>
+                  <Field>
+                    <FieldLabel htmlFor={id('reason')}>{t('linkEdit.removeReason')}</FieldLabel>
                     <NativeSelect id={id('reason')} value={reason} onChange={(event) => setReason(event.target.value)}>
                       <NativeSelectOption value="">{t('linkEdit.removeNoReason')}</NativeSelectOption>
                       {REMOVAL_REASONS.map((key) => (
@@ -345,10 +344,10 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
                         </NativeSelectOption>
                       ))}
                     </NativeSelect>
-                    <FieldHint>{t('linkEdit.removeReasonHint')}</FieldHint>
-                  </div>
+                    <FieldDescription>{t('linkEdit.removeReasonHint')}</FieldDescription>
+                  </Field>
                 ) : (
-                  <FieldHint>{t('linkEdit.removeOwnHint')}</FieldHint>
+                  <FieldDescription>{t('linkEdit.removeOwnHint')}</FieldDescription>
                 )}
                 <div className="flex flex-wrap gap-2">
                   {confirmRemove ? (
@@ -370,8 +369,8 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
             ) : null}
 
             {can.retier ? (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={id('pin')}>{t('linkEdit.retier')}</Label>
+              <Field>
+                <FieldLabel htmlFor={id('pin')}>{t('linkEdit.retier')}</FieldLabel>
                 <div className="flex gap-2">
                   <NativeSelect
                     id={id('pin')}
@@ -401,8 +400,8 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
                     {t('linkEdit.retierApply')}
                   </Button>
                 </div>
-                <FieldHint>{pinned ? t('linkEdit.retierDone') : t('linkEdit.retierHint')}</FieldHint>
-              </div>
+                <FieldDescription>{pinned ? t('linkEdit.retierDone') : t('linkEdit.retierHint')}</FieldDescription>
+              </Field>
             ) : null}
           </section>
         ) : null}
