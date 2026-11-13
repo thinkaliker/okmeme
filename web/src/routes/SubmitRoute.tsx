@@ -5,7 +5,7 @@ import { ApiError } from '@/api/client';
 import { TagPicker } from '@/components/TagPicker';
 import { VisibilityChoice } from '@/components/VisibilityChoice';
 import { Button } from '@/components/ui/button';
-import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
@@ -236,7 +236,7 @@ export default function SubmitRoute() {
         </Field>
       ) : null}
 
-      {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
+      <FieldError>{error}</FieldError>
 
       <div>
         <Button type="submit" disabled={pending}>

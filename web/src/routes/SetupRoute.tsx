@@ -4,7 +4,7 @@ import { ApiError } from '@/api/client';
 import { setup, type SetupResult } from '@/api/endpoints';
 import { RecoveryCodes } from '@/components/RecoveryCodes';
 import { Button } from '@/components/ui/button';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { t } from '@/i18n/t';
@@ -175,7 +175,7 @@ export default function SetupRoute() {
             </FieldDescription>
           </Field>
 
-          {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
+          <FieldError>{error}</FieldError>
 
           <Button type="submit" disabled={pending}>
             {t('setup.create')}

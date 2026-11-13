@@ -8,7 +8,7 @@ import { RecoveryCodes } from '@/components/RecoveryCodes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
@@ -550,7 +550,7 @@ function SuspendForm({ user, onDone }: { user: AdminUser; onDone: () => void }) 
         <FieldDescription>{t('admin.suspendNoteHint')}</FieldDescription>
       </Field>
 
-      {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
+      <FieldError>{error}</FieldError>
 
       <div>
         <Button size="sm" variant="destructive" onClick={() => void submit()}>
@@ -728,7 +728,7 @@ function Users({ viewer, selfId }: { viewer: ViewerTier; selfId: string | null }
         </Button>
       </form>
 
-      {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
+      <FieldError>{error}</FieldError>
       {issued === null ? null : (
         <RecoveryCodes codes={issued} onAcknowledge={() => setIssued(null)} />
       )}
@@ -905,7 +905,7 @@ function Categories() {
         )}
       </form>
 
-      {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
+      <FieldError>{error}</FieldError>
 
       {items.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
@@ -1357,7 +1357,7 @@ function Invites() {
         {wide ? <FieldDescription className="text-destructive">{t('admin.inviteWideWarning')}</FieldDescription> : null}
       </form>
 
-      {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
+      <FieldError>{error}</FieldError>
 
       {/* Hashed at rest. Once this box is dismissed the code exists nowhere but
           wherever the admin put it. */}
@@ -1640,7 +1640,7 @@ function Settings({ viewerTier }: { viewerTier: number }) {
       {/* min_writer_tier is why this is a list and not a form: some keys need
           more than admin, and invite_min_tier is the reason that exists. */}
       <p className="text-sm text-muted-foreground">{t('admin.settingsHint')}</p>
-      {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
+      <FieldError>{error}</FieldError>
 
       <ul className="flex flex-col gap-2">
         {items.map((setting) => {

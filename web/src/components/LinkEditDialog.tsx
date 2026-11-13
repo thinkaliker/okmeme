@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
@@ -406,11 +406,7 @@ export function LinkEditDialog({ link, onChange, className }: LinkEditDialogProp
           </section>
         ) : null}
 
-        {failed ? (
-          <p role="alert" className="text-sm text-destructive">
-            {t('linkEdit.failed')}
-          </p>
-        ) : null}
+        {failed ? <FieldError>{t('linkEdit.failed')}</FieldError> : null}
 
         {can.edit || can.setTier ? null : (
           <DialogFooter>

@@ -3,7 +3,7 @@ import { ApiError } from '@/api/client';
 import { owner } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import type { InstanceSetting, Owner } from '@/domain/admin';
@@ -84,7 +84,7 @@ export default function OwnerRoute() {
     <div className="flex max-w-2xl flex-col gap-8">
       <h1 className="text-lg font-semibold">{t('owner.title')}</h1>
 
-      {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
+      <FieldError>{error}</FieldError>
 
       <section aria-labelledby="owners-heading" className="flex flex-col gap-3">
         <h2 id="owners-heading" className="text-sm font-semibold">

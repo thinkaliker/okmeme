@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { auth } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { USE_MOCK_API } from '@/config';
 import type { TierOrdinal } from '@/domain/tier';
@@ -64,7 +64,7 @@ export default function LoginRoute() {
           <FieldDescription>{t('auth.noEmail')}</FieldDescription>
         </Field>
 
-        {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
+        <FieldError>{error}</FieldError>
 
         <Button type="submit" disabled={pending}>
           {t('auth.login')}

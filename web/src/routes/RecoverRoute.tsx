@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { auth } from '@/api/endpoints';
 import { Button } from '@/components/ui/button';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { t } from '@/i18n/t';
@@ -98,7 +98,7 @@ export default function RecoverRoute() {
           />
         </Field>
 
-        {error === null ? null : <p className="text-sm text-destructive">{error}</p>}
+        <FieldError>{error}</FieldError>
 
         <Button type="submit" disabled={pending}>
           {t('auth.recover')}

@@ -6,7 +6,7 @@ import { RecoveryCodes } from '@/components/RecoveryCodes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
@@ -252,7 +252,7 @@ export default function SettingsRoute() {
                 </Button>
               </div>
               {appealState === 'already' ? (
-                <p className="text-sm text-destructive">{t('sanction.appealFiled')}</p>
+                <FieldError>{t('sanction.appealFiled')}</FieldError>
               ) : null}
             </>
           )}
@@ -398,11 +398,7 @@ function PermissionsSection() {
         </table>
       </div>
 
-      {failed ? (
-        <p role="alert" className="text-sm text-destructive">
-          {t('permission.failed')}
-        </p>
-      ) : null}
+      {failed ? <FieldError>{t('permission.failed')}</FieldError> : null}
     </section>
   );
 }
@@ -468,7 +464,7 @@ function SecuritySection() {
 
       {/* Changing a password revokes every other session and every token. */}
       {state === 'done' ? <FieldDescription>{t('auth.passwordChanged')}</FieldDescription> : null}
-      {state === 'failed' ? <p className="text-sm text-destructive">{t('auth.failed')}</p> : null}
+      {state === 'failed' ? <FieldError>{t('auth.failed')}</FieldError> : null}
     </section>
   );
 }
