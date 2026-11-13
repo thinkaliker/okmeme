@@ -53,9 +53,8 @@ describe('view as', () => {
     expect(await screen.findAllByText('pip')).not.toHaveLength(0);
     expect(screen.getAllByText('sandra')).not.toHaveLength(0);
 
-    fireEvent.change(await screen.findByLabelText('View the site as a lower tier'), {
-      target: { value: '1' },
-    });
+    fireEvent.keyDown(await screen.findByLabelText('View the site as a lower tier'), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'limited' }));
 
     // The bar replaces the header control, and has focus.
     const bar = await screen.findByRole('region', { name: 'Tier preview' });
