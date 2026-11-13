@@ -6,7 +6,13 @@ import { describe, expect, it } from 'vitest';
  * and two of upstream's habits break rules this app holds elsewhere. This test
  * is what notices.
  */
-const raw = import.meta.glob<string>('./*.tsx', { query: '?raw', import: 'default', eager: true });
+/*
+ * No `glob<string>(`: Vitest keeps transformed modules in node_modules/.vitest-cache
+ * and skips only files containing the literal text `import.meta.glob(`. With
+ * a type argument in between, this file was cached with the folder listing of
+ * its first run, and components added later were never checked.
+ */
+const raw = import.meta.glob('./*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
 /** Code only: the comments in these files name the very classes they leave out. */
 const sources = Object.fromEntries(
