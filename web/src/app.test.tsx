@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { RouterProvider } from 'react-router-dom';
 import { transport } from '@/api/transport';
 import { DisplayProvider } from '@/display/DisplayProvider';
@@ -84,5 +84,26 @@ describe('view as', () => {
     mountApp();
     await screen.findAllByRole('article', {}, { timeout: 4000 });
     expect(screen.queryByLabelText('View the site as a lower tier')).toBeNull();
+  });
+});
+
+describe('phone menu', () => {
+  it('opens the nav in a sheet, and a link or Escape closes it', async () => {
+    mountApp();
+    await screen.findAllByRole('article', {}, { timeout: 4000 });
+    const button = screen.getByRole('button', { name: 'Menu' });
+
+    // Following a link closes the sheet behind it.
+    fireEvent.click(button);
+    let sheet = await screen.findByRole('dialog', { name: 'Menu' });
+    fireEvent.click(await within(sheet).findByRole('link', { name: /Music/ }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    // Escape closes it too, and focus goes back to the button.
+    fireEvent.click(button);
+    sheet = await screen.findByRole('dialog', { name: 'Menu' });
+    fireEvent.keyDown(sheet, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(button));
   });
 });

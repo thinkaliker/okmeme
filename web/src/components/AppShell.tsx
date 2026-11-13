@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link as RouterLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom';
 import { Bookmark, KeyRound, LogIn, LogOut, Menu, Plus, Search, Settings, Shield } from 'lucide-react';
 import { CategoryNav } from '@/components/CategoryNav';
@@ -9,8 +9,9 @@ import { PreviewBar, ViewAsTrigger } from '@/components/ViewAs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useDisplay } from '@/display/DisplayProvider';
-import { can, isAuthorTierLabel } from '@/domain/tier';
+import { can, isAuthorTierLabel, type ViewerTier } from '@/domain/tier';
 import { t, tierLabel } from '@/i18n/t';
 import { cn } from '@/lib/utils';
 import { useSession } from '@/session/SessionProvider';
@@ -61,12 +62,83 @@ function SearchForm() {
   );
 }
 
+/** The category list and the account links: the desktop sidebar, and the phone's sheet. */
+function SiteNav({ navTier, onNavigate }: { navTier: ViewerTier; onNavigate: () => void }) {
+  const { me, allows, viewAs } = useSession();
+  return (
+    <div className="flex flex-col gap-4">
+      <CategoryNav onNavigate={onNavigate} />
+
+      <div className="flex flex-col gap-0.5 border-t border-border pt-3">
+        {allows('submit') ? (
+          <Button variant="ghost" size="sm" asChild className="justify-start sm:hidden">
+            <RouterLink to="/submit" onClick={onNavigate}>
+              <Plus />
+              {t('nav.submit')}
+            </RouterLink>
+          </Button>
+        ) : null}
+        {/* Bookmarks are yours, not the previewed tier's, and the list is
+            not answered through the preview, so it has no place in one. */}
+        {me === null || viewAs !== null ? null : (
+          <Button variant="ghost" size="sm" asChild className="justify-start">
+            <RouterLink to="/bookmarks" onClick={onNavigate}>
+              <Bookmark />
+              {t('nav.bookmarks')}
+            </RouterLink>
+          </Button>
+        )}
+        {me === null ? null : (
+          <Button variant="ghost" size="sm" asChild className="justify-start">
+            <RouterLink to="/settings" onClick={onNavigate}>
+              <Settings />
+              {t('nav.settings')}
+            </RouterLink>
+          </Button>
+        )}
+        {/* Presentation only. The routes are gated on the server; hiding
+            the entry here keeps the nav tidy and authorizes nothing.
+            Staff reach it for the tag queue and nothing else. */}
+        {can.createTags(navTier) || can.reviewReports(navTier) ? (
+          <Button variant="ghost" size="sm" asChild className="justify-start">
+            <RouterLink to="/admin" onClick={onNavigate}>
+              <Shield />
+              {can.reviewReports(navTier) ? t('nav.admin') : t('nav.moderation')}
+            </RouterLink>
+          </Button>
+        ) : null}
+        {/* Owner is recovery and system settings only, so it gets its own
+            entry rather than sharing the moderation one. */}
+        {can.ownerSettings(navTier) ? (
+          <Button variant="ghost" size="sm" asChild className="justify-start">
+            <RouterLink to="/owner" onClick={onNavigate}>
+              <KeyRound />
+              {t('owner.title')}
+            </RouterLink>
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function AppShell() {
   const { me, tier, allows, viewAs, logout } = useSession();
   const { width } = useDisplay();
   const [navOpen, setNavOpen] = useState(false);
   const viewAsFocus = useRef<'bar' | 'trigger' | null>(null);
   usePreferenceSync();
+
+  // The sheet is the phone's nav. Widened to md, the sidebar is back, and a
+  // sheet left open would be a second copy of it over the page.
+  useEffect(() => {
+    const wide = window.matchMedia('(min-width: 48rem)');
+    const close = () => {
+      if (wide.matches) setNavOpen(false);
+    };
+    wide.addEventListener('change', close);
+    return () => wide.removeEventListener('change', close);
+  }, []);
 
   // While previewing, the nav is the one the previewed tier would get. The
   // admin and owner routes stay reachable by address and answer for the real
@@ -89,17 +161,24 @@ export function AppShell() {
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
         <PreviewBar container={container} focusAfter={viewAsFocus} />
         <div className={cn(container, 'flex h-14 items-center gap-2')}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            aria-expanded={navOpen}
-            aria-controls="site-nav"
-            aria-label={t('app.menu')}
-            onClick={() => setNavOpen((open) => !open)}
-          >
-            <Menu />
-          </Button>
+          <Sheet open={navOpen} onOpenChange={setNavOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="md:hidden" aria-label={t('app.menu')}>
+                <Menu />
+              </Button>
+            </SheetTrigger>
+            {/* Named "Menu", like the button that opens it; the wordmark is only
+                the sheet's masthead. No description, so none is announced. */}
+            <SheetContent side="left" aria-describedby={undefined} className="w-72 gap-3 overflow-y-auto p-4">
+              <SheetHeader className="p-0">
+                <SheetTitle className="sr-only">{t('app.menu')}</SheetTitle>
+                <span aria-hidden="true" className="text-lg font-black tracking-tight text-primary italic">
+                  {t('app.name')}
+                </span>
+              </SheetHeader>
+              <SiteNav navTier={navTier} onNavigate={() => setNavOpen(false)} />
+            </SheetContent>
+          </Sheet>
 
           <RouterLink to="/" className="text-lg font-black italic tracking-tight text-primary">
             {t('app.name')}
@@ -151,66 +230,13 @@ export function AppShell() {
       </header>
 
       <div className={cn(container, 'flex gap-6 py-4 compact:py-2')}>
-        <aside
-          id="site-nav"
-          className={`${navOpen ? 'block' : 'hidden'} w-full shrink-0 md:block md:w-48`}
-        >
-          <div className="sticky top-18 flex flex-col gap-4">
-            <CategoryNav onNavigate={() => setNavOpen(false)} />
-
-            <div className="flex flex-col gap-0.5 border-t border-border pt-3">
-              {allows('submit') ? (
-                <Button variant="ghost" size="sm" asChild className="justify-start sm:hidden">
-                  <RouterLink to="/submit" onClick={() => setNavOpen(false)}>
-                    <Plus />
-                    {t('nav.submit')}
-                  </RouterLink>
-                </Button>
-              ) : null}
-              {/* Bookmarks are yours, not the previewed tier's, and the list is
-                  not answered through the preview, so it has no place in one. */}
-              {me === null || viewAs !== null ? null : (
-                <Button variant="ghost" size="sm" asChild className="justify-start">
-                  <RouterLink to="/bookmarks" onClick={() => setNavOpen(false)}>
-                    <Bookmark />
-                    {t('nav.bookmarks')}
-                  </RouterLink>
-                </Button>
-              )}
-              {me === null ? null : (
-                <Button variant="ghost" size="sm" asChild className="justify-start">
-                  <RouterLink to="/settings" onClick={() => setNavOpen(false)}>
-                    <Settings />
-                    {t('nav.settings')}
-                  </RouterLink>
-                </Button>
-              )}
-              {/* Presentation only. The routes are gated on the server; hiding
-                  the entry here keeps the nav tidy and authorizes nothing.
-                  Staff reach it for the tag queue and nothing else. */}
-              {can.createTags(navTier) || can.reviewReports(navTier) ? (
-                <Button variant="ghost" size="sm" asChild className="justify-start">
-                  <RouterLink to="/admin" onClick={() => setNavOpen(false)}>
-                    <Shield />
-                    {can.reviewReports(navTier) ? t('nav.admin') : t('nav.moderation')}
-                  </RouterLink>
-                </Button>
-              ) : null}
-              {/* Owner is recovery and system settings only, so it gets its own
-                  entry rather than sharing the moderation one. */}
-              {can.ownerSettings(navTier) ? (
-                <Button variant="ghost" size="sm" asChild className="justify-start">
-                  <RouterLink to="/owner" onClick={() => setNavOpen(false)}>
-                    <KeyRound />
-                    {t('owner.title')}
-                  </RouterLink>
-                </Button>
-              ) : null}
-            </div>
+        <aside className="hidden w-48 shrink-0 md:block">
+          <div className="sticky top-18">
+            <SiteNav navTier={navTier} onNavigate={() => setNavOpen(false)} />
           </div>
         </aside>
 
-        <main id="main" className={`${navOpen ? 'hidden' : 'block'} min-w-0 flex-1 md:block`}>
+        <main id="main" className="min-w-0 flex-1">
           <SanctionBannerSlot />
           {/* A new tier is a new set of rows, not an edit to the old ones:
               remounting starts every list from its first page, for that tier. */}
